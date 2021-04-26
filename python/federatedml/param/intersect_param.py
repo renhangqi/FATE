@@ -129,6 +129,68 @@ class RSAParam(BaseParam):
         return True
 
 
+class CardinalityParam(BaseParam):
+    """
+    Define the hash method for Cardinality intersect method
+
+    Parameters
+    ----------
+    salt: the src data string will be str = str + salt, default ''
+
+    hash_method: str, the hash method of src data string, it support sha256, sha384, sha512, sm3, default sha256
+
+    final_hash_method: str, the hash method of result data string, it support md5, sha1, sha224, sha256, sha384, sha512, sm3, default md5
+
+    use_obfuscation: bool, if True, Host & Guest will include dummy sketches when generating local top k sketches
+
+    obfuscation_fraction: non-negative float, if not None, generate (fraction * local id count) of dummy ids and then re-select
+        top k sketches from mixing obfuscation items and real top k sketches;
+        note that value greater than 0.99 will be taken as 1, and value less than 0.01 will be rounded to 0, which leads to
+        general estimation method without obfuscation
+    """
+
+    def __init__(self, salt='', hash_method='sha256',  final_hash_method='md5',
+                 use_obfuscation=False, obfuscation_fraction=None):
+        super().__init__()
+        self.salt = salt
+        self.hash_method = hash_method
+        self.final_hash_method = final_hash_method
+        self.use_obfuscation = use_obfuscation
+        self.obfuscation_fraction = obfuscation_fraction
+
+    def check(self):
+        if type(self.salt).__name__ != "str":
+            raise ValueError(
+                "cardinality param's salt {} not supported, should be str type".format(
+                    self.salt))
+
+        descr = "cardinality param's hash_method "
+        self.hash_method = self.check_and_change_lower(self.hash_method,
+                                                       [consts.SHA256, consts.SHA384, consts.SHA512, consts.SM3],
+                                                       descr)
+
+        descr = "cardinality param's final_hash_method "
+        self.final_hash_method = self.check_and_change_lower(self.final_hash_method,
+                                                             [consts.MD5, consts.SHA1, consts.SHA224,
+                                                              consts.SHA256, consts.SHA384, consts.SHA512,
+                                                              consts.SM3],
+                                                             descr)
+
+        descr = "cardinality param's use_obfuscation"
+        self.check_boolean(self.use_obsfuscation, descr)
+
+        descr = "cardinality param's obfuscation_fraction"
+        if self.obfuscation_fraction:
+            self.check_decimal_float(self.obfuscation_fraction, descr)
+            if self.obfuscation_fraction < consts.FLOAT_ZERO:
+                raise ValueError(f"{descr} cannot be negative")
+            if self.obfuscation_fraction < 0.01:
+                self.obfuscation_fraction = 0
+
+        LOGGER.debug("Finish CardinalityParam parameter check!")
+        return True
+
+
 class IntersectCache(BaseParam):
     def __init__(self, use_cache=False, id_type=consts.PHONE, encrypt_type=consts.SHA256):
         super().__init__()
@@ -157,7 +219,7 @@ class IntersectParam(BaseParam):
 
     Parameters
     ----------
-    intersect_method: str, it supports 'rsa' and 'raw', default by 'raw'
+    intersect_method: str, it supports 'rsa', 'raw', 'cardinality', default by 'raw'
 
     random_bit: positive int, it will define the encrypt length of rsa algorithm. It effective only for intersect_method is rsa
 
@@ -187,6 +249,8 @@ class IntersectParam(BaseParam):
 
     new_join_id: bool, whether to generate new id for repeated_id_owners' ids, only effective when join_method is 'left_join', default False
 
+    cardinality_param: Cardinality Param, specifies settings for cardinality intersection method
+
     """
 
     def __init__(self, intersect_method: str = consts.RAW, random_bit=128, sync_intersect_ids=True,
@@ -195,7 +259,7 @@ class IntersectParam(BaseParam):
                  rsa_params=RSAParam(),
                  intersect_cache_param=IntersectCache(), repeated_id_process=False, repeated_id_owner=consts.GUEST,
                  with_sample_id=False, join_method=consts.INNER_JOIN, new_join_id=False,
-                 allow_info_share: bool = False, info_owner=consts.GUEST):
+                 allow_info_share: bool = False, info_owner=consts.GUEST, cardinality_param=CardinalityParam()):
         super().__init__()
         self.intersect_method = intersect_method
         self.random_bit = random_bit
@@ -213,12 +277,13 @@ class IntersectParam(BaseParam):
         self.with_sample_id = with_sample_id
         self.join_method = join_method
         self.new_join_id = new_join_id
+        self.cardinality_param = cardinality_param
 
     def check(self):
         descr = "intersect param's "
 
         self.intersect_method = self.check_and_change_lower(self.intersect_method,
-                                                            [consts.RSA, consts.RAW],
+                                                            [consts.RSA, consts.RAW, consts.CARDINALITY],
                                                             f"{descr}intersect_method")
 
         if type(self.random_bit).__name__ not in ["int"]:
@@ -278,5 +343,7 @@ class IntersectParam(BaseParam):
 
         self.encode_params.check()
         self.rsa_params.check()
+        self.cardinality_param.check()
+
         LOGGER.debug("Finish intersect parameter check!")
         return True
