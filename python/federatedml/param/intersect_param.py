@@ -141,20 +141,26 @@ class CardinalityParam(BaseParam):
 
     final_hash_method: str, the hash method of result data string, it support md5, sha1, sha224, sha256, sha384, sha512, sm3, default md5
 
-    use_obfuscation: bool, if True, Host & Guest will include dummy sketches when generating local top k sketches
+    k_fraction: positive float, each party generates (k_fraction * local id count) sketches for estimating cardinality,
+        default 0.01
 
-    obfuscation_fraction: non-negative float, if not None, generate (fraction * local id count) of dummy ids and then re-select
+    use_obfuscation: bool, if True, Host & Guest will include dummy sketches when generating local top k sketches,
+        default 0.1
+
+    obfuscation_fraction: non-negative float, if not None, generate (obfuscation_fraction * local id count) of dummy ids and then re-select
         top k sketches from mixing obfuscation items and real top k sketches;
         note that value greater than 0.99 will be taken as 1, and value less than 0.01 will be rounded to 0, which leads to
         general estimation method without obfuscation
+
     """
 
     def __init__(self, salt='', hash_method='sha256',  final_hash_method='md5',
-                 use_obfuscation=False, obfuscation_fraction=None):
+                 k_fraction=0.01, use_obfuscation=False, obfuscation_fraction=0.1):
         super().__init__()
         self.salt = salt
         self.hash_method = hash_method
         self.final_hash_method = final_hash_method
+        self.k_fraction = k_fraction
         self.use_obfuscation = use_obfuscation
         self.obfuscation_fraction = obfuscation_fraction
 
@@ -178,6 +184,10 @@ class CardinalityParam(BaseParam):
 
         descr = "cardinality param's use_obfuscation"
         self.check_boolean(self.use_obsfuscation, descr)
+
+        descr = "cardinality param's k_fraction"
+        self.check_positive_number(self.k_fraction, descr)
+        self.check_decimal_float(self.k_fraction, descr)
 
         descr = "cardinality param's obfuscation_fraction"
         if self.obfuscation_fraction:
@@ -249,7 +259,7 @@ class IntersectParam(BaseParam):
 
     new_join_id: bool, whether to generate new id for repeated_id_owners' ids, only effective when join_method is 'left_join', default False
 
-    cardinality_param: Cardinality Param, specifies settings for cardinality intersection method
+    cardinality_params: CardinalityParam, specifies settings for cardinality intersection method
 
     """
 
@@ -259,7 +269,7 @@ class IntersectParam(BaseParam):
                  rsa_params=RSAParam(),
                  intersect_cache_param=IntersectCache(), repeated_id_process=False, repeated_id_owner=consts.GUEST,
                  with_sample_id=False, join_method=consts.INNER_JOIN, new_join_id=False,
-                 allow_info_share: bool = False, info_owner=consts.GUEST, cardinality_param=CardinalityParam()):
+                 allow_info_share: bool = False, info_owner=consts.GUEST, cardinality_params=CardinalityParam()):
         super().__init__()
         self.intersect_method = intersect_method
         self.random_bit = random_bit
@@ -277,7 +287,7 @@ class IntersectParam(BaseParam):
         self.with_sample_id = with_sample_id
         self.join_method = join_method
         self.new_join_id = new_join_id
-        self.cardinality_param = cardinality_param
+        self.cardinality_params = cardinality_params
 
     def check(self):
         descr = "intersect param's "
@@ -343,7 +353,7 @@ class IntersectParam(BaseParam):
 
         self.encode_params.check()
         self.rsa_params.check()
-        self.cardinality_param.check()
+        self.cardinality_params.check()
 
         LOGGER.debug("Finish intersect parameter check!")
         return True

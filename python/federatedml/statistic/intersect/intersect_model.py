@@ -252,7 +252,6 @@ class IntersectGuest(IntersectModelBase):
 
         if self.model_param.intersect_method == "rsa":
             self.intersection_obj = RsaIntersectionGuest()
-            self.intersection_obj.guest_party_id = self.guest_party_id
 
         elif self.model_param.intersect_method == "raw":
             self.intersection_obj = RawIntersectionGuest()
