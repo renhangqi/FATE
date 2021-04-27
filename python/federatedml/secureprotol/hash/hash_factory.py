@@ -1,4 +1,5 @@
 import base64
+import binascii
 import hashlib
 import libsm3py
 
@@ -6,9 +7,10 @@ from federatedml.util import LOGGER
 
 
 class Hash:
-    def __init__(self, method, base64=0):
+    def __init__(self, method, base64=0, hexdigest=True):
         self.method = method
         self.base64 = base64
+        self.hexdigest = hexdigest
 
         self.dist_encode_function = {
             "md5": self.__compute_md5,
@@ -30,43 +32,65 @@ class Hash:
         if self.base64 == 1:
             return str(base64.b64encode(hashlib.md5(bytes(value, encoding='utf-8')).digest()), "utf-8")
         else:
-            return hashlib.md5(bytes(value, encoding='utf-8')).hexdigest()
+            if self.hexdigest:
+                return hashlib.md5(bytes(value, encoding='utf-8')).hexdigest()
+            else:
+                return hashlib.md5(bytes(value, encoding='utf-8')).digest()
 
     def __compute_sha256(self, value):
         if self.base64 == 1:
             return str(base64.b64encode(hashlib.sha256(bytes(value, encoding='utf-8')).digest()), "utf-8")
         else:
-            return hashlib.sha256(bytes(value, encoding='utf-8')).hexdigest()
+            if self.hexdigest:
+                return hashlib.sha256(bytes(value, encoding='utf-8')).hexdigest()
+            else:
+                return hashlib.sha256(bytes(value, encoding='utf-8')).digest()
 
     def __compute_sha1(self, value):
         if self.base64 == 1:
             return str(base64.b64encode(hashlib.sha1(bytes(value, encoding='utf-8')).digest()), "utf-8")
         else:
-            return hashlib.sha1(bytes(value, encoding='utf-8')).hexdigest()
+            if self.hexdigest:
+                return hashlib.sha1(bytes(value, encoding='utf-8')).hexdigest()
+            else:
+                return hashlib.sha1(bytes(value, encoding='utf-8')).digest()
 
     def __compute_sha224(self, value):
         if self.base64 == 1:
             return str(base64.b64encode(hashlib.sha224(bytes(value, encoding='utf-8')).digest()), "utf-8")
         else:
-            return hashlib.sha224(bytes(value, encoding='utf-8')).hexdigest()
+            if self.hexdigest:
+                return hashlib.sha224(bytes(value, encoding='utf-8')).hexdigest()
+            else:
+                return hashlib.sha224(bytes(value, encoding='utf-8')).digest()
 
     def __compute_sha512(self, value):
         if self.base64 == 1:
             return str(base64.b64encode(hashlib.sha512(bytes(value, encoding='utf-8')).digest()), "utf-8")
         else:
-            return hashlib.sha512(bytes(value, encoding='utf-8')).hexdigest()
+            if self.hexdigest:
+                return hashlib.sha512(bytes(value, encoding='utf-8')).hexdigest()
+            else:
+                return hashlib.sha512(bytes(value, encoding='utf-8')).digest()
 
     def __compute_sha384(self, value):
         if self.base64 == 1:
             return str(base64.b64encode(hashlib.sha384(bytes(value, encoding='utf-8')).digest()), "utf-8")
         else:
-            return hashlib.sha384(bytes(value, encoding='utf-8')).hexdigest()
+            if self.hexdigest:
+                return hashlib.sha384(bytes(value, encoding='utf-8')).hexdigest()
+            else:
+                return hashlib.sha384(bytes(value, encoding='utf-8')).digest()
 
     def __compute_sm3(self, value):
         if self.base64 == 1:
-            return str(base64.b64encode(libsm3py.hash(bytes(value, encoding='utf-8')).encode('utf-8')), "utf-8")
+            return str(base64.b64encode(binascii.unhexlify(libsm3py.hash(bytes(value, encoding='utf-8')).hex())),
+                       "utf-8")
         else:
-            return libsm3py.hash(bytes(value, encoding='utf-8')).hex()
+            if self.hexdigest:
+                return libsm3py.hash(bytes(value, encoding='utf-8')).hex()
+            else:
+                return binascii.unhexlify(libsm3py.hash(bytes(value, encoding='utf-8')).hex())
 
     def __compute_no_hash(self, value):
         if self.base64 == 1:

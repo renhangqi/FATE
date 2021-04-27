@@ -148,10 +148,13 @@ class CardinalityParam(BaseParam):
         note that value greater than 0.99 will be taken as 1, and value less than 0.01 will be rounded to 0, which leads to
         general estimation method without obfuscation
 
+    sync_ca_info: bool, whether join_role sync cardinality count with other participant(s), default False
+
     """
 
     def __init__(self, salt='', hash_method='sha256',  final_hash_method='md5',
-                 k_fraction=0.01, use_obfuscation=False, obfuscation_fraction=0.1):
+                 k_fraction=0.01, use_obfuscation=False, obfuscation_fraction=0.1,
+                 sync_ca_info=False):
         super().__init__()
         self.salt = salt
         self.hash_method = hash_method
@@ -159,6 +162,7 @@ class CardinalityParam(BaseParam):
         self.k_fraction = k_fraction
         self.use_obfuscation = use_obfuscation
         self.obfuscation_fraction = obfuscation_fraction
+        self.sync_ca_info = sync_ca_info
 
     def check(self):
         if type(self.salt).__name__ != "str":
@@ -192,6 +196,9 @@ class CardinalityParam(BaseParam):
                 raise ValueError(f"{descr} cannot be negative")
             if self.obfuscation_fraction < 0.01:
                 self.obfuscation_fraction = 0
+
+        descr = "cardinality param's sync_ca_info"
+        self.check_boolean(self.sync_ca_info, descr)
 
         return True
 

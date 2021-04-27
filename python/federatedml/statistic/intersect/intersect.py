@@ -15,14 +15,14 @@
 #
 
 import random
+import struct
 import uuid
 
 from federatedml.param.intersect_param import IntersectParam
 from federatedml.secureprotol import gmpy_math
 from federatedml.secureprotol.encrypt import RsaEncrypt
 from federatedml.secureprotol.hash.hash_factory import Hash
-from federatedml.util import consts
-from federatedml.util import LOGGER
+from federatedml.util import consts, conversion, LOGGER
 from federatedml.transfer_variable.transfer_class.raw_intersect_transfer_variable import RawIntersectTransferVariable
 from federatedml.transfer_variable.transfer_class.rsa_intersect_transfer_variable import RsaIntersectTransferVariable
 
@@ -426,3 +426,48 @@ class RawIntersect(Intersect):
                 LOGGER.info("save guest_{}'s id in name:{}, namespace:{}".format(k, table_name, namespace))
 
         return intersect_ids
+
+
+class CardinalityIntersect(Intersect):
+    def __init__(self):
+        super().__init__()
+        self.role = None
+        self.transfer_variable = CardinalityIntersectTransferVariable()
+        self.task_version_id = None
+        self.tracker = None
+
+    def load_params(self, param):
+        self.join_role = param.join_role
+        self.random_bit = param.random_bit
+        self.cardinality_params = param.cardinality_params
+        self.sync_ca_info = self.cardinality_params.sync_ca_info
+        self.k_fraction = self.cardinality_params.k_fraction
+        self.use_obfuscation = self.cardinality_params.use_obfuscation
+        self.obfuscation_fraction = self.cardinality_params.obfuscation_fraction
+        self.first_hash_operator = Hash(self.cardinality_params.hash_method, False, False)
+        self.final_hash_operator = Hash(self.cardinality_params.final_hash_method, False, False)
+        self.salt = self.cardinality_params.salt
+
+    @staticmethod
+    def hash_value_float(v, first_hash_operator, final_hash_operator, salt):
+        hash_v = Intersect.hash(Intersect.hash(v, first_hash_operator, salt), final_hash_operator, salt)
+        # convert to float in range [0, 1]
+        float_hash_v = float(struct.unpack('Q', hash_v[:8])[0] / (2 ** 64))
+        return float_hash_v
+
+    @staticmethod
+    def hash_value_int(v, n, first_hash_operator, final_hash_operator, salt):
+        hash_v = Intersect.hash(Intersect.hash(v, first_hash_operator, salt), final_hash_operator, salt)
+        # convert to in in range [0, n]
+        int_hash_v = conversion.str_to_int(hash_v) % n
+        return int_hash_v
+
+    @staticmethod
+    def get_union_cardinality(top_k, k):
+        return round((k - 1) / top_k)
+
+    @staticmethod
+    def get_intersection_cardinality_property(union_ca, all_count):
+        return sum(all_count) - union_ca
+
+
