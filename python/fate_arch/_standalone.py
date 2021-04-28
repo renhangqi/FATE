@@ -21,6 +21,7 @@ import shutil
 import time
 import typing
 import uuid
+import itertools
 from collections import Iterable
 from concurrent.futures import ProcessPoolExecutor as Executor
 from contextlib import ExitStack
@@ -37,8 +38,6 @@ from fate_arch.common import file_utils, Party
 from fate_arch.common.log import getLogger
 
 LOGGER = getLogger()
-
-
 # noinspection PyPep8Naming
 class Table(object):
     def __init__(
@@ -199,6 +198,9 @@ class Table(object):
 
     def sample(self, fraction, seed=None):
         return self._unary((fraction, seed), _do_sample)
+
+    def take(self, n):
+        return list(itertools.islice(self.collect(), n))
 
     def filter(self, func):
         return self._unary(func, _do_filter)
