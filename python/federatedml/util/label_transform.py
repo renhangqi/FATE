@@ -22,6 +22,7 @@ from fate_flow.entity.metric import Metric, MetricMeta
 from federatedml.feature.instance import Instance
 from federatedml.model_base import ModelBase
 from federatedml.param.label_transform_param import LabelTransformParam
+from federatedml.protobuf.generated import label_transform_meta_pb2, label_transform_param_pb2
 from federatedml.statistic.data_overview import get_label_count
 from federatedml.util import consts, LOGGER
 
@@ -33,43 +34,77 @@ class LabelTransformer(ModelBase):
         self.metric_name = "label_transform"
         self.metric_namespace = "train"
         self.metric_type = "LABEL_TRANSFORM"
+        self.model_param_name = 'LabelTransformParam'
+        self.model_meta_name = 'LabelTransformMeta'
         self.weight_mode = None
+        self.encoder_key_type = None
+        self.encoder_value_type = None
 
     def _init_model(self, params):
         self.model_param = params
         self.label_encoder = params.label_encoder
+        self.label_list = params.label_list
         self.need_run = params.need_run
 
-    @staticmethod
-    def replace_instance_label(instance, label_encoder):
-        new_instance = copy.deepcopy(instance)
-        new_instance.label = label_encoder[instance.label]
-        return new_instance
+    def get_label_encoder(self, data):
+        if self.label_encoder is not None:
+            LOGGER.info(f"label encoder provided")
+            if self.label_list is not None:
+                LOGGER.info(f"label list provided")
+                self.encoder_key_type = {str(v): type(v).__name__ for v in self.label_list}
 
-    @staticmethod
-    def replace_predict_label(predict_result, label_encoder):
-        #@todo: replace label in predcit result
-        pass
-
-    @staticmethod
-    def get_label_encoder(data, label_encoder):
-        if label_encoder is not None:
-            return label_encoder
-        # @TODO: get label encoder dict
-        # normal data instance
-        if isinstance(data.first()[1], Instance):
-            label_count = get_label_count(data)
-            label_encoder = dict(zip(label_count.keys(), range(len(label_count.keys()))))
-        # predict result
         else:
-            pass
+            if isinstance(data.first()[1], Instance):
+                label_count = get_label_count(data)
+                self.label_encoder = dict(zip(label_count.keys(), range(len(label_count.keys()))))
+            # predict result
+            else:
+                #@todo: get all labels
+                pass
+        if self.encoder_key_type is None:
+            self.encoder_key_type = {str(k): type(k).__name__ for k in self.label_encoder.keys()}
+        self.encoder_value_type = {str(k): type(v).__name__ for k, v in self.label_encoder.items()}
+        label_encoder = {load_value_to_type(k, self.encoder_key_type[str(k)]): v for k, v in self.label_encoder.items()}
         return label_encoder
 
-    def export_model(self):
-        pass
+    def _get_meta(self):
+        meta = label_transform_meta_pb2.LabelTransformMeta(
+            need_run=self.need_run
+        )
+        return meta
 
-    def load_model(self):
-        pass
+    def _get_param(self):
+        label_encoder = {str(k): str(v) for k, v in self.label_encoder}
+        param = label_transform_param_pb2.LabelTransformParam(
+            label_encoder=label_encoder,
+            encoder_key_type=self.encoder_key_type,
+            encoder_value_type=self.encoder_value_type)
+        return param
+
+    def export_model(self):
+        meta_obj = self._get_meta()
+        param_obj = self._get_param()
+        result = {
+            self.model_meta_name: meta_obj,
+            self.model_param_name: param_obj
+        }
+        self.model_output = result
+        return result
+
+    def load_model(self, model_dict):
+        meta_obj = list(model_dict.get('model').values())[0].get(self.model_meta_name)
+        param_obj = list(model_dict.get('model').values())[0].get(self.model_param_name)
+
+        self.need_run = meta_obj.need_run
+
+        self.encoder_key_type = param_obj.encoder_key_type
+        self.encoder_value_type = param_obj.encoder_value_type
+        self.label_encoder = {
+            load_value_to_type(k, self.encoder_key_type[k]): load_value_to_type(v, self.encoder_value_type[k])
+            for k, v in param_obj.label_encoder.items()
+        }
+
+        return
 
     def callback_info(self):
         metric_meta = MetricMeta(name='train',
@@ -84,6 +119,17 @@ class LabelTransformer(ModelBase):
         self.tracker.set_metric_meta(metric_namespace=self.metric_namespace,
                                      metric_name=self.metric_name,
                                      metric_meta=metric_meta)
+
+    @staticmethod
+    def replace_instance_label(instance, label_encoder):
+        new_instance = copy.deepcopy(instance)
+        new_instance.label = label_encoder[instance.label]
+        return new_instance
+
+    @staticmethod
+    def replace_predict_label(predict_result, label_encoder):
+        #@todo: replace label in predcit result
+        pass
 
     @staticmethod
     def transform_data_label(data, label_encoder):
@@ -110,14 +156,22 @@ class LabelTransformer(ModelBase):
 
     def fit(self, data):
         LOGGER.info(f"Enter Label Transform Fit")
-
-        if self.label_encoder is None:
-            self.label_encoder = LabelTransformer.get_label_encoder(data, self.label_encoder)
-        else:
-            LOGGER.info(f"Label encoder provided.")
+        self.label_encoder = self.get_label_encoder(data)
 
         result_data = LabelTransformer.transform_data_label(data, self.label_encoder)
         result_data.schema = data.schema
         self.callback_info()
 
         return result_data
+
+
+def load_value_to_type(value, value_type):
+    if value is None:
+        loaded_value = None
+    elif value_type in ["int", "int64", "long", "float", "float64", "double"]:
+        loaded_value = getattr(np, value_type)(value)
+    elif value_type in ["str", "_str"]:
+        loaded_value = str(value)
+    else:
+        raise ValueError(f"unknown value type: {value_type}")
+    return loaded_value

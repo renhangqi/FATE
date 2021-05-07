@@ -1,0 +1,11 @@
+{
+    "module_path":  "federatedml/util",
+    "param_class" : "federatedml/param/label_transform_param.py/LabelTransformParam",
+    "role":
+    {
+        "guest":
+        {
+            "program": "label_transform.py/LabelTransformer"
+        }
+    }
+}

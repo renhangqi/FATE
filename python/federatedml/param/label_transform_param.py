@@ -31,14 +31,18 @@ class LabelTransformParam(BaseParam):
     label_encoder : None, dict, default : None
         Specify (label, encoded label) key-value pairs for transforming labels to new values.
 
+    label_list : None, list, default : None
+        List all input labels, used for matching types of original keys in label_encoder dict
+
     need_run: bool, default: True
         Specify whether to run label transform
 
     """
 
-    def __init__(self, label_encoder=None, need_run=True):
+    def __init__(self, label_encoder=None, label_list=None, need_run=True):
         super(LabelTransformParam, self).__init__()
         self.label_encoder = label_encoder
+        self.label_list = label_list
         self.need_run = need_run
 
     def check(self):
@@ -49,6 +53,10 @@ class LabelTransformParam(BaseParam):
         if self.label_encoder is not None:
             if not isinstance(self.label_encoder, dict):
                 raise ValueError(f"{model_param_descr} label_encoder should be dict type")
+
+        if self.label_list is not None:
+            if not isinstance(self.label_list, list):
+                raise ValueError(f"{model_param_descr} label_list should be list type")
 
         LOGGER.debug("Finish label transformer parameter check!")
         return True
