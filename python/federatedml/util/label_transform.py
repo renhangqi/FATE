@@ -59,6 +59,7 @@ class LabelTransformer(ModelBase):
         # normal data instance
         if isinstance(data.first()[1], Instance):
             label_count = get_label_count(data)
+            label_encoder = dict(zip(label_count.keys(), range(len(label_count.keys()))))
         # predict result
         else:
             pass
@@ -87,23 +88,35 @@ class LabelTransformer(ModelBase):
     @staticmethod
     def transform_data_label(data, label_encoder):
         if isinstance(data.first()[1], Instance):
-            return data.mapValues(lambda v: LabelTransform.replace_instance_label(v, label_encoder))
+            return data.mapValues(lambda v: LabelTransformer.replace_instance_label(v, label_encoder))
         else:
-            return data.mapValues(lambda v: LabelTransform.replace_predict_label(v, label_encoder))
+            return data.mapValues(lambda v: LabelTransformer.replace_predict_label(v, label_encoder))
 
-    def transform(self, data_instances):
+    def transform(self, data):
         LOGGER.info(f"Enter Label Transformer Transform")
-        return self.fit(data_instances)
+        if self.label_encoder is None:
+            raise ValueError(f"Input Label Encoder is None. Label Transform aborted.")
+
+        label_encoder = self.label_encoder
+        # revert label encoding if predict result
+        if not isinstance(data.first()[1], Instance):
+            label_encoder = dict(zip(self.label_encoder.values(), self.label_encoder.keys()))
+
+        result_data = LabelTransformer.transform_data_label(data, label_encoder)
+        result_data.schema = data.schema
+        self.callback_info()
+
+        return result_data
 
     def fit(self, data):
         LOGGER.info(f"Enter Label Transform Fit")
 
         if self.label_encoder is None:
-            self.label_encoder = LabelTransform.get_label_encoder(data, self.label_encoder)
+            self.label_encoder = LabelTransformer.get_label_encoder(data, self.label_encoder)
         else:
             LOGGER.info(f"Label encoder provided.")
 
-        result_data = LabelTransform.transform_data_label(data, self.label_encoder)
+        result_data = LabelTransformer.transform_data_label(data, self.label_encoder)
         result_data.schema = data.schema
         self.callback_info()
 
