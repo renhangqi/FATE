@@ -17,13 +17,14 @@
 #  limitations under the License.
 
 import copy
+import numpy as np
 
 from fate_flow.entity.metric import Metric, MetricMeta
 from federatedml.feature.instance import Instance
 from federatedml.model_base import ModelBase
 from federatedml.param.label_transform_param import LabelTransformParam
 from federatedml.protobuf.generated import label_transform_meta_pb2, label_transform_param_pb2
-from federatedml.statistic.data_overview import get_label_count
+from federatedml.statistic.data_overview import get_label_count, get_predict_result_labels
 from federatedml.util import consts, LOGGER
 
 
@@ -52,18 +53,19 @@ class LabelTransformer(ModelBase):
             if self.label_list is not None:
                 LOGGER.info(f"label list provided")
                 self.encoder_key_type = {str(v): type(v).__name__ for v in self.label_list}
-
         else:
             if isinstance(data.first()[1], Instance):
                 label_count = get_label_count(data)
-                self.label_encoder = dict(zip(label_count.keys(), range(len(label_count.keys()))))
+                labels = sorted(label_count.keys())
             # predict result
             else:
-                #@todo: get all labels
-                pass
+                labels = sorted(get_predict_result_labels(data))
+            self.label_encoder = dict(zip(labels, range(len(labels))))
+
         if self.encoder_key_type is None:
             self.encoder_key_type = {str(k): type(k).__name__ for k in self.label_encoder.keys()}
         self.encoder_value_type = {str(k): type(v).__name__ for k, v in self.label_encoder.items()}
+
         label_encoder = {load_value_to_type(k, self.encoder_key_type[str(k)]): v for k, v in self.label_encoder.items()}
         return label_encoder
 
@@ -128,8 +130,10 @@ class LabelTransformer(ModelBase):
 
     @staticmethod
     def replace_predict_label(predict_result, label_encoder):
-        #@todo: replace label in predcit result
-        pass
+        true_label, predict_label, predict_score, predict_detail = copy.deepcopy(predict_result)
+        true_label, predict_label = label_encoder[true_label], label_encoder[predict_label]
+        predict_detail = {label_encoder[label]: score for label, score in predict_detail.items()}
+        return [true_label, predict_label, predict_score, predict_detail]
 
     @staticmethod
     def transform_data_label(data, label_encoder):
