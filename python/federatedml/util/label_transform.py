@@ -168,7 +168,7 @@ class LabelTransformer(ModelBase):
 
         return result_data
 
-
+# also used in feature imputation, to be moved to common util
 def load_value_to_type(value, value_type):
     if value is None:
         loaded_value = None
