@@ -43,7 +43,7 @@
                     "dense"
                 ]
             },
-            "intersect_0": {
+            "intersection_0": {
                 "intersect_method": [
                     "rsa"
                 ],
@@ -82,7 +82,7 @@
                     "dense"
                 ]
             },
-            "intersect_0": {
+            "intersection_0": {
                 "intersect_method": [
                     "rsa"
                 ],
