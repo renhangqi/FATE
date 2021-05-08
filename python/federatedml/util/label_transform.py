@@ -40,6 +40,8 @@ class LabelTransformer(ModelBase):
         self.weight_mode = None
         self.encoder_key_type = None
         self.encoder_value_type = None
+        self.label_encoder = None
+        self.label_list = None
 
     def _init_model(self, params):
         self.model_param = params
@@ -53,6 +55,7 @@ class LabelTransformer(ModelBase):
             if self.label_list is not None:
                 LOGGER.info(f"label list provided")
                 self.encoder_key_type = {str(v): type(v).__name__ for v in self.label_list}
+
         else:
             if isinstance(data.first()[1], Instance):
                 label_count = get_label_count(data)
@@ -76,7 +79,9 @@ class LabelTransformer(ModelBase):
         return meta
 
     def _get_param(self):
-        label_encoder = {str(k): str(v) for k, v in self.label_encoder}
+        label_encoder = self.label_encoder
+        if self.label_encoder is not None:
+            label_encoder = {str(k): str(v) for k, v in self.label_encoder.items()}
         param = label_transform_param_pb2.LabelTransformParam(
             label_encoder=label_encoder,
             encoder_key_type=self.encoder_key_type,
@@ -130,10 +135,11 @@ class LabelTransformer(ModelBase):
 
     @staticmethod
     def replace_predict_label(predict_result, label_encoder):
-        true_label, predict_label, predict_score, predict_detail = copy.deepcopy(predict_result)
+        true_label, predict_label, predict_score, predict_detail, result_type = copy.deepcopy(predict_result)
         true_label, predict_label = label_encoder[true_label], label_encoder[predict_label]
-        predict_detail = {label_encoder[label]: score for label, score in predict_detail.items()}
-        return [true_label, predict_label, predict_score, predict_detail]
+        label_encoder_detail = {str(k): v for k, v in label_encoder.items()}
+        predict_detail = {label_encoder_detail[label]: score for label, score in predict_detail.items()}
+        return [true_label, predict_label, predict_score, predict_detail, result_type]
 
     @staticmethod
     def transform_data_label(data, label_encoder):
