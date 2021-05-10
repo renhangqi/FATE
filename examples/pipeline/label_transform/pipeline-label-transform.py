@@ -65,7 +65,7 @@ def main(config="../../config.yaml", namespace=""):
                                                                             output_format="dense")
     intersection_0 = Intersection(name="intersection_0")
 
-    label_transform_0 = LabelTransform(name="labeltransform_0")
+    label_transform_0 = LabelTransform(name="label_transform_0")
     label_transform_0.get_party_instance(role="host", party_id=host).component_param(need_run=False)
 
     hetero_lr_0 = HeteroLR(name="hetero_lr_0", penalty="L2", optimizer="sgd", tol=0.001,
@@ -75,8 +75,7 @@ def main(config="../../config.yaml", namespace=""):
                                encrypted_mode_calculator_param={"mode": "fast"},
                                floating_point_precision=23)
 
-    label_transform_1 = LabelTransform(name="labeltransform_1")
-    label_transform_0.get_party_instance(role="host", party_id=host).component_param(need_run=False)
+    label_transform_1 = LabelTransform(name="label_transform_1")
     evaluation_0 = Evaluation(name="evaluation_0", eval_type="binary", pos_label=1)
 
 
