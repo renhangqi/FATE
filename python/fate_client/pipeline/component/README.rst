@@ -511,6 +511,13 @@ Below lists input and output elements of each component.
      - None
      - None
 
+   * - `Label Transform`_
+     - Label Transform
+     - Replaces label values of input data instances and predict results
+     - data
+     - data
+     - model
+     - model
 
 
 .. _DataIO: ../../../federatedml/util/README.rst
@@ -544,6 +551,7 @@ Below lists input and output elements of each component.
 .. _Scorecard: ../../../federatedml/statistic/scorecard/README.rst
 .. _Feldman Verifiable Sum: ../../../federatedml/statistic/feldman_verifiable_sum/README.rst
 .. _Sample Weight: ../../../federatedml/util/README.rst
+.. _Label Transform: ../../../federatedml/util/README.rst
 
 
 Params

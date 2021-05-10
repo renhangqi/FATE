@@ -95,3 +95,31 @@ How to Use
     .. Note::
 
         If both ``class_weight`` and ``sample_weight_name`` are provided, values from column of ``sample_weight_name`` will be used.
+
+
+Label Transform
+===============
+
+Label Transform module is a local module that replaces label values of input data instances and predict results.
+Mapping of original and new label values may be specified by input param ``label_encoder``.
+Note that when using label encoder, if original label values include non-string values, user should also list
+all original label values with input param ``label_list``.
+
+If no ``label_encoder`` is provided, labels will be sorted and mapped to integer values starting at 0.
+
+To restore labels in prediction results, run the transformed prediction results through DataTransform Module
+while proving the original DataTransform Model from fit stage.
+
+If total label counts exceeds maximum limit for categorical label count, an exception will be raised.
+
+
+How to Use
+----------
+
+:params:
+
+    :label_encoder: dict, specify (label, encoded label) key-value pairs for transforming labels to new values.
+
+    :sample_weight_name: list, list all input labels, used for matching types of original keys in label_encoder dict
+
+    :need_run: bool, whether to run this module or not

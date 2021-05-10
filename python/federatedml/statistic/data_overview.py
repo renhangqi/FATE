@@ -202,6 +202,9 @@ def get_predict_result_labels(data):
 
     label_set = data.applyPartitions(_get_labels)
     label_set = label_set.reduce(lambda x1, x2: x1.union(x2))
+    if len(label_set) > consts.MAX_CLASSNUM:
+        raise ValueError("In Classify Task, max dif classes should be no more than %d" % (consts.MAX_CLASSNUM))
+
     return label_set
 
 
