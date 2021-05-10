@@ -110,6 +110,9 @@ If no ``label_encoder`` is provided, labels will be sorted and mapped to integer
 To restore labels in prediction results, run the transformed prediction results through DataTransform Module
 while proving the original DataTransform Model from fit stage.
 
+If prediction results from regression model
+are provided, module will output input data without modification.
+
 If total label counts exceeds maximum limit for categorical label count, an exception will be raised.
 
 

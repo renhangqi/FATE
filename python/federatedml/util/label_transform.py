@@ -146,6 +146,10 @@ class LabelTransformer(ModelBase):
         if isinstance(data.first()[1], Instance):
             return data.mapValues(lambda v: LabelTransformer.replace_instance_label(v, label_encoder))
         else:
+            predict_detail = data.first()[1][3]
+            if len(predict_detail) == 1 and list(predict_detail.keys())[0] == "label":
+                LOGGER.info(f"Regression prediction result provided. Original data returned.")
+                return data
             return data.mapValues(lambda v: LabelTransformer.replace_predict_label(v, label_encoder))
 
     def transform(self, data):
