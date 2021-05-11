@@ -1,25 +1,48 @@
 from federatedml.secureprotol.fixedpoint import FixedPointNumber
 from federatedml.secureprotol import PaillierEncrypt, IterativeAffineEncrypt
 from federatedml.secureprotol.fate_paillier import PaillierEncryptedNumber
-from federatedml.ensemble.basic_algorithms.decision_tree.tree_core.splitinfo_cipher_compressor import SplitInfoPackage
+from federatedml.cipher_compressor.compressor import NormalCipherPackage
+from federatedml.ensemble.basic_algorithms.decision_tree.tree_core.splitter import SplitInfo
 from federatedml.util import LOGGER
 
-VERY_SMALL_FLOAT = -0.000000000001  # for computing edge cases
+
 precision = 2**53
 
-RESERVED_BIT = 1
-
 # range of gradient and hessian
-G_MAX = 8.0
-G_MIN = -8.0
-H_MAX = 8.0
+G_MAX = 1.0
+G_MIN = -1.0
+H_MAX = 1.0
 
-G_OFFSET = 8.0
+G_OFFSET = 1.0
 
 
-def iter_fix_point_test(float_num, precision):
-    fix_point_int = int(float_num * precision)
-    return fix_point_int
+class SplitInfoPackage(NormalCipherPackage):
+
+    def __init__(self, padding_length, max_capacity, round_decimal):
+        super(SplitInfoPackage, self).__init__(padding_length, max_capacity, round_decimal)
+        self._split_info_without_gh = []
+        self._cur_splitinfo_contains = 0
+
+    def add(self, split_info):
+
+        split_info_cp = SplitInfo(sitename=split_info.sitename, best_bid=split_info.best_bid,
+                                  best_fid=split_info.best_fid, missing_dir=split_info.missing_dir,
+                                  mask_id=split_info.mask_id, sample_count=split_info.sample_count)
+
+        en_g = split_info.sum_grad
+        super(SplitInfoPackage, self).add(en_g)
+        self._cur_splitinfo_contains += 1
+        self._split_info_without_gh.append(split_info_cp)
+
+    def has_space(self):
+        return self._capacity_left - 1 >= 0  # g and h
+
+    def unpack(self, decrypter):
+        unpack_rs = super(SplitInfoPackage, self).unpack(decrypter)
+        for split_info, g_h in zip(self._split_info_without_gh, unpack_rs):
+            split_info.sum_grad = g_h
+
+        return self._split_info_without_gh
 
 
 def get_homo_encryption_max_int(encrypter):
@@ -70,10 +93,10 @@ def encode(num, mul, modulo):
     return int_fixpoint % modulo
 
 
-def pack_2(gh, mul, g_modulo, h_modulo, offset):
+def pack(gh, mul, g_modulo, h_modulo, offset):
 
     g, h = gh[0], gh[1]
-    g += G_OFFSET  # become positive
+    g += G_OFFSET  # to positive
     g_encoding = encode(g, mul, g_modulo)
     h_encoding = encode(h, mul, h_modulo)
     pack_num = (g_encoding << offset) + h_encoding
@@ -84,7 +107,7 @@ def pack_and_encrypt(gh, g_modulo, g_max_int, h_modulo, h_max_int, offset, encry
 
     exponent = FixedPointNumber.encode(0, g_modulo, g_max_int, precision).exponent
     mul = pow(FixedPointNumber.BASE, exponent)
-    pack_num = pack_2(gh, mul, g_modulo, h_modulo, offset)
+    pack_num = pack(gh, mul, g_modulo, h_modulo, offset)
     encrypt_num = raw_encrypt(pack_num, encrypter, exponent=exponent)
     return encrypt_num, 0
 
@@ -142,7 +165,7 @@ class GHPacker(object):
     def pack(self, gh, encrypter):
 
         en_num = pack_and_encrypt(gh, self.g_modulo, self.g_max_int, self.h_modulo, self.h_max_int, self.offset,
-                                        encrypter, self.precision)
+                                  encrypter, self.precision)
         return en_num
 
     def unpack(self, en_num, encrypter, offset_sample_num, remove_offset=True):
@@ -197,88 +220,3 @@ class PackedGHDecompressor(object):
             rs_list.extend(p.unpack(self.encrypter))
 
         return rs_list
-
-
-if __name__ == '__main__':
-
-    from federatedml.secureprotol.fixedpoint import FixedPointNumber
-    from federatedml.secureprotol import PaillierEncrypt, IterativeAffineEncrypt
-    from federatedml.ensemble.basic_algorithms.decision_tree.tree_core.splitter import SplitInfo
-    import numpy as np
-    import time
-
-    sample_num = 1000
-    g = np.concatenate([-np.random.random(sample_num)])
-    h = np.random.random(sample_num)
-
-    encrypter = IterativeAffineEncrypt()
-    encrypter.generate_key(1024)
-    precision = 2 ** 53
-    pos_max, neg_min = get_homo_encryption_max_int(encrypter)
-    g_assign_bit, g_modulo, g_max_int, h_assign_bit, h_modulo, h_max_int, capacity = bit_assign_suggest(pos_max, neg_min,
-                                                                                              sample_num, precision)
-
-    s = time.time()
-    print('g assign {} h assign {}'.format(g_assign_bit, h_assign_bit))
-
-    exponent = FixedPointNumber.encode(0, g_modulo, g_max_int, precision).exponent
-    pack_time_s = time.time()
-    pack_g_h = []
-    mul = pow(FixedPointNumber.BASE, exponent)
-
-    for g_, h_ in zip(g, h):
-        pack_g_h.append(pack_2((g_, h_), mul, g_modulo, h_modulo, offset=h_assign_bit))
-        # pack_g_h.append(pack((g_, h_), g_modulo, g_max_int, h_modulo, h_max_int, h_assign_bit))
-
-    pack_time_e = time.time()
-    print('pack time', pack_time_e - pack_time_s)
-    en_paillier = [raw_encrypt(i, encrypter, exponent) for i in pack_g_h]
-    en_test = en_paillier[0]
-    for i in en_paillier[1:500]:
-        en_test += i
-    en_test2 = en_paillier[500]
-    for i in en_paillier[501:]:
-        en_test2 += i
-
-    g_sum_1, g_sum_2 = np.sum(g[0:500]), np.sum(g[500:])
-    h_sum_1, h_sum_2 = np.sum(h[0:500]), np.sum(h[500:])
-
-    print(g_sum_1, h_sum_1)
-    print(g_sum_2, h_sum_2)
-    de_rs = raw_decrypt(en_test, encrypter)
-    test_g_1, test_h_1 = unpack(de_rs, h_assign_bit, g_modulo, g_max_int, h_modulo, h_max_int, exponent)
-    test_g_1 = test_g_1 - 500*G_OFFSET
-    print(test_g_1, test_h_1)
-
-    split_info_1 = SplitInfo(sum_grad=en_test, sample_count=500)
-    split_info_2 = SplitInfo(sum_grad=en_test2, sample_count=500)
-    pack = SplitInfoPackage(h_assign_bit + g_assign_bit, capacity, 0)
-    pack.add(split_info_1)
-    pack.add(split_info_2)
-
-
-    # de_rs = raw_decrypt(en_test, encrypter)
-    #
-    # print(unpack(de_rs, h_assign_bit, g_modulo, g_max_int, h_modulo, h_max_int, exponent))
-    # e = time.time()
-    # print('take time {}'.format(e - s))
-    #
-    # s = time.time()
-    # en_g = [encrypter.encrypt(i) for i in g]
-    # en_h = [encrypter.encrypt(i) for i in h]
-    # g_rs = en_g[0]
-    # for i in en_g[1:]:
-    #     g_rs += i
-    # h_rs = en_h[0]
-    # for i in en_h[1:]:
-    #     h_rs += i
-    #
-    # de_g = encrypter.decrypt(g_rs)
-    # de_h = encrypter.decrypt(h_rs)
-    # print(de_g)
-    # print(de_h)
-    # e = time.time()
-    # print('take time {}'.format(e - s))
-    #
-    # print(g.sum())
-    # print(h.sum())
