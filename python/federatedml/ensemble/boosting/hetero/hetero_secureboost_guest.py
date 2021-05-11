@@ -38,7 +38,6 @@ class HeteroSecureBoostingTreeGuest(HeteroBoostingGuest):
         self.max_sample_weight = 1
         self.max_sample_weight_computed = False
         self.cipher_compressing = False
-        self.round_decimal = None
 
         self.enable_goss = False  # GOSS
         self.top_rate = None
@@ -55,7 +54,7 @@ class HeteroSecureBoostingTreeGuest(HeteroBoostingGuest):
         self.enable_goss = param.run_goss
         self.top_rate = param.top_rate
         self.other_rate = param.other_rate
-        self.round_decimal = param.cipher_compress_error
+        self.cipher_compressing = param.cipher_compress
         self.new_ver = param.new_ver
 
         if self.use_missing:
@@ -128,9 +127,7 @@ class HeteroSecureBoostingTreeGuest(HeteroBoostingGuest):
                   goss_subsample=self.enable_goss,
                   top_rate=self.top_rate, other_rate=self.other_rate,
                   complete_secure=True if (self.cur_epoch_idx == 0 and self.complete_secure) else False,
-                  cipher_compressing=self.round_decimal is not None,
-                  round_decimal=self.round_decimal,
-                  encrypt_key_length=self.encrypt_param.key_length,
+                  cipher_compressing=self.cipher_compressing,
                   max_sample_weight=self.max_sample_weight,
                   new_ver=self.new_ver
                   )

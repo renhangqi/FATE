@@ -139,9 +139,6 @@ class HeteroDecisionTreeGuest(DecisionTree):
             self.goss_sampling()
             self.max_sample_weight = self.max_sample_weight * ((1 - top_rate) / other_rate)
 
-        if self.run_cipher_compressing:
-            self.init_compressor()
-
         self.new_ver = new_ver
 
         self.report_init_status()
@@ -335,15 +332,11 @@ class HeteroDecisionTreeGuest(DecisionTree):
         host_split_info_tables = self.transfer_inst.encrypted_splitinfo_host.get(idx=-1, suffix=(dep, batch_idx))
         best_splits_of_all_hosts = []
 
-        if self.run_cipher_compressing:
-            self.cipher_decompressor.renew_decompressor(node_map)
-        cipher_decompressor = self.cipher_decompressor if self.run_cipher_compressing else None
-
         for host_idx, split_info_table in enumerate(host_split_info_tables):
 
             host_split_info = self.splitter.find_host_best_split_info(split_info_table, self.get_host_sitename(host_idx),
                                                                       self.encrypter,
-                                                                      cipher_decompressor=cipher_decompressor)
+                                                                      gh_packer=self.packer)
             split_info_list = [None for i in range(len(host_split_info))]
             for key in host_split_info:
                 split_info_list[node_map[key]] = host_split_info[key]
@@ -509,19 +502,6 @@ class HeteroDecisionTreeGuest(DecisionTree):
     Pre-porcess / Post-Process
     """
 
-    def init_compressor(self):
-
-        self.cipher_encoder = GuestGradHessEncoder(self.encrypter, self.encrypted_mode_calculator, task_type=consts.CLASSIFICATION,
-                                                   round_decimal=self.round_decimal, max_sample_weights=self.max_sample_weight)
-
-        self.cipher_decompressor = GuestSplitInfoDecompressor(self.encrypter, task_type=consts.CLASSIFICATION,
-                                                              max_sample_weight=self.max_sample_weight)
-
-        max_capacity_int = self.encrypter.public_key.max_int
-        para = {'max_capacity_int': max_capacity_int, 'en_type': self.get_encrypt_type(),
-                'max_sample_weight': self.max_sample_weight}
-
-        self.transfer_inst.cipher_compressor_para.remote(para, idx=-1)
 
     def goss_sampling(self,):
         new_g_h = goss_sampling(self.grad_and_hess, self.top_rate, self.other_rate)

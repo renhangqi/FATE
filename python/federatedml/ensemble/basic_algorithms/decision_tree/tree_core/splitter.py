@@ -361,7 +361,7 @@ class Splitter(object):
 
         return result_list
 
-    def _find_host_best_splits_map_func(self, value, decrypter, cipher_decompressor=None, gh_packer=None,
+    def _find_host_best_splits_map_func(self, value, decrypter, gh_packer=None,
                                         host_sitename=consts.HOST):
 
         # find best split points in a node for every host feature, mapValues function
@@ -377,27 +377,25 @@ class Splitter(object):
             split_info_list, g_h_info = value
             for split_info in split_info_list:
                 split_info.sum_grad, split_info.sum_hess = decrypter.decrypt(split_info.sum_grad), decrypter.decrypt(split_info.sum_hess)
+            g_sum, h_sum = decrypter.decrypt(g_h_info.sum_grad), decrypter.decrypt(g_h_info.sum_hess)
         else:
-            if type(value[1]) != list:
-                split_info_list, g_h_info = value
-                for split_info in split_info_list:
-                    en_num = split_info.sum_grad
-                    g, h = gh_packer.unpack(en_num, decrypter, split_info.sample_count)
-                    split_info.sum_grad = g
-                    split_info.sum_hess = h
-                g_sum, h_sum = gh_packer.unpack(g_h_info.sum_grad, decrypter, g_h_info.sample_count)
-            else:
-                nid, package = value
-                split_info_list = gh_packer.decompress_and_unpack(package, decrypter)
-                g_sum, h_sum = split_info_list[-1].sum_grad, split_info_list[-1].sum_hess  # g/h is at last index
-                split_info_list = split_info_list[:-1]
+            # if type(value[1]) != list:
+            #     split_info_list, g_h_info = value
+            #     for split_info in split_info_list:
+            #         en_num = split_info.sum_grad
+            #         g, h = gh_packer.unpack(en_num, decrypter, split_info.sample_count)
+            #         split_info.sum_grad = g
+            #         split_info.sum_hess = h
+            #     g_sum, h_sum = gh_packer.unpack(g_h_info.sum_grad, decrypter, g_h_info.sample_count)
+            # else:
+            nid, package = value
+            split_info_list = gh_packer.decompress_and_unpack(package, decrypter)
+            g_sum, h_sum = split_info_list[-1].sum_grad, split_info_list[-1].sum_hess  # g/h is at last index
+            split_info_list = split_info_list[:-1]
 
         for idx, split_info in enumerate(split_info_list):
 
             l_g, l_h = split_info.sum_grad, split_info.sum_hess
-
-            # if cipher_decompressor is None:  # decrypt g/h
-            #     l_g, l_h = decrypter.decrypt(l_g), decrypter.decrypt(l_h)
 
             r_g, r_h = g_sum - l_g, h_sum - l_h
             gain = self.split_gain(g_sum, h_sum, l_g, l_h, r_g, r_h)
@@ -430,13 +428,11 @@ class Splitter(object):
             else:
                 return -1
 
-    def find_host_best_split_info(self, host_split_info_table, host_sitename, decrypter, cipher_decompressor=None,
-                                  gh_packer=None):
+    def find_host_best_split_info(self, host_split_info_table, host_sitename, decrypter, gh_packer=None):
 
         map_func = functools.partial(self._find_host_best_splits_map_func,
                                      decrypter=decrypter,
                                      host_sitename=host_sitename,
-                                     cipher_decompressor=cipher_decompressor,
                                      gh_packer=gh_packer
                                      )
 
