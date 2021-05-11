@@ -282,14 +282,12 @@ class HeteroDecisionTreeHost(DecisionTree):
         LOGGER.info("get the {}-th predict finish tag from guest".format(recv_times))
         finish_tag = self.transfer_inst.predict_finish_tag.get(idx=0,
                                                                suffix=(recv_times,))
-
         return finish_tag
 
     def sync_predict_data(self, recv_times):
         LOGGER.info("srecv predict data to host, recv times is {}".format(recv_times))
         predict_data = self.transfer_inst.predict_data.get(idx=0,
                                                            suffix=(recv_times,))
-
         return predict_data
 
     def sync_data_predicted_by_host(self, predict_data, send_times):
@@ -390,7 +388,6 @@ class HeteroDecisionTreeHost(DecisionTree):
         for i in range(len(self.tree_node)):
             if self.tree_node[i].is_leaf is True:
                 continue
-
             if self.tree_node[i].sitename == self.sitename:
                 fid = decode_func("feature_idx", self.tree_node[i].fid, self.tree_node[i].id, maskdict)
                 bid = decode_func("feature_val", self.tree_node[i].bid, self.tree_node[i].id, maskdict)
@@ -417,11 +414,9 @@ class HeteroDecisionTreeHost(DecisionTree):
 
         LOGGER.info('solving node batch {}, node num is {}'.format(batch, len(cur_to_split_nodes)))
         if not self.complete_secure_tree:
-
             data = self.data_with_node_assignments
             if self.run_sparse_opt:
                 data = self.data_bin_dense_with_position
-
             inst2node_idx = self.get_computing_inst2node_idx()
             node_sample_count = self.count_node_sample_num(inst2node_idx, node_map)
             LOGGER.debug('sample count is {}'.format(node_sample_count))

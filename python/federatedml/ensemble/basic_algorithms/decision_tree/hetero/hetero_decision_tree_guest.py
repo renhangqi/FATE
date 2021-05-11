@@ -393,14 +393,16 @@ class HeteroDecisionTreeGuest(DecisionTree):
         if self.run_cipher_compressing:
 
             pos_max, neg_min = get_homo_encryption_max_int(self.encrypter)
-            self.packer = GHPacker(pos_max=pos_max, neg_min=neg_min, sample_num=self.data_bin.count())
+            self.packer = GHPacker(pos_max=pos_max, sample_num=self.data_bin.count(), )
             padding_bit_len, capacity = self.packer.total_bit_len, self.packer.cipher_compress_capacity
+
             if type(self.encrypter) == IterativeAffineEncrypt:
                 capacity = 1  # iterative affine only support gh packing
+
             para = {'padding_bit_len': padding_bit_len, 'max_capacity': capacity}
             self.transfer_inst.cipher_compressor_para.remote(para, idx=-1)
             LOGGER.info('sending compressing para {}'.format(para))
-            pack_func = functools.partial(self.packer.pack, encrypter=self.encrypter)
+            pack_func = functools.partial(self.packer.pack_and_encrypt, encrypter=self.encrypter)
             pack_gh = self.grad_and_hess.mapValues(pack_func)
             en_grad_hess = pack_gh
         else:

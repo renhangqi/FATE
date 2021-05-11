@@ -25,7 +25,7 @@ pack_g_h = []
 mul = pow(FixedPointNumber.BASE, exponent)
 
 for g_, h_ in zip(g, h):
-    pack_g_h.append(pack((g_, h_), mul, g_modulo, h_modulo, offset=h_assign_bit))
+    pack_g_h.append(pack_func((g_, h_), mul, g_modulo, h_modulo, offset=h_assign_bit))
     # pack_g_h.append(pack((g_, h_), g_modulo, g_max_int, h_modulo, h_max_int, h_assign_bit))
 
 pack_time_e = time.time()
@@ -44,7 +44,7 @@ h_sum_1, h_sum_2 = np.sum(h[0:500]), np.sum(h[500:])
 print(g_sum_1, h_sum_1)
 print(g_sum_2, h_sum_2)
 de_rs = raw_decrypt(en_test, encrypter)
-test_g_1, test_h_1 = unpack(de_rs, h_assign_bit, g_modulo, g_max_int, h_modulo, h_max_int, exponent)
+test_g_1, test_h_1 = unpack_func(de_rs, h_assign_bit, g_modulo, g_max_int, h_modulo, h_max_int, exponent)
 test_g_1 = test_g_1 - 500*G_OFFSET
 print(test_g_1, test_h_1)
 
