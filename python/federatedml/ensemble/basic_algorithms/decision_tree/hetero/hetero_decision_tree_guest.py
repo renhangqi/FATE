@@ -10,10 +10,9 @@ from federatedml.protobuf.generated.boosting_tree_model_meta_pb2 import Decision
 from federatedml.protobuf.generated.boosting_tree_model_param_pb2 import DecisionTreeModelParam
 from federatedml.transfer_variable.transfer_class.hetero_decision_tree_transfer_variable import \
     HeteroDecisionTreeTransferVariable
-from federatedml.ensemble.basic_algorithms.decision_tree.tree_core.splitinfo_cipher_compressor import \
-    GuestSplitInfoDecompressor, GuestGradHessEncoder
 from federatedml.secureprotol import PaillierEncrypt, IterativeAffineEncrypt
 from federatedml.ensemble.basic_algorithms.decision_tree.tree_core.subsample import goss_sampling
+from federatedml.ensemble.basic_algorithms.decision_tree.tree_core.g_h_optim import GHPacker, get_homo_encryption_max_int
 from federatedml.util import consts
 
 
@@ -38,11 +37,8 @@ class HeteroDecisionTreeGuest(DecisionTree):
         self.top_rate, self.other_rate = 0.2, 0.1  # goss sampling rate
 
         # cipher compressing
-        self.cipher_encoder = None
-        self.cipher_decompressor = None
-        self.run_cipher_compressing = False
-        self.key_length = None
-        self.round_decimal = 7
+        self.run_cipher_compressing = True
+        self.packer = None
         self.max_sample_weight = 1
 
         # code version control
@@ -105,7 +101,6 @@ class HeteroDecisionTreeGuest(DecisionTree):
                                                                                  self.data_bin.count()))
         if self.run_cipher_compressing:
             LOGGER.info('running cipher compressing')
-            LOGGER.info('round decimal is {}'.format(self.round_decimal))
         LOGGER.info('updated max sample weight is {}'.format(self.max_sample_weight))
 
         if self.deterministic:
@@ -120,8 +115,6 @@ class HeteroDecisionTreeGuest(DecisionTree):
              top_rate=0.1,
              other_rate=0.2,
              cipher_compressing=False,
-             encrypt_key_length=None,
-             round_decimal=7,
              max_sample_weight=1,
              new_ver=True):
 
@@ -140,8 +133,6 @@ class HeteroDecisionTreeGuest(DecisionTree):
         self.other_rate = other_rate
 
         self.run_cipher_compressing = cipher_compressing
-        self.key_length = encrypt_key_length
-        self.round_decimal = round_decimal
         self.max_sample_weight = max_sample_weight
 
         if self.run_goss:
@@ -407,12 +398,22 @@ class HeteroDecisionTreeGuest(DecisionTree):
     def process_and_sync_grad_and_hess(self, idx=-1):
 
         if self.run_cipher_compressing:
-            LOGGER.info('sending encoded g/h to host')
-            en_grad_hess = self.cipher_encoder.encode_g_h_and_encrypt(self.grad_and_hess)
+
+            pos_max, neg_min = get_homo_encryption_max_int(self.encrypter)
+            self.packer = GHPacker(pos_max=pos_max, neg_min=neg_min, sample_num=self.data_bin.count())
+            padding_bit_len, capacity = self.packer.total_bit_len, self.packer.cipher_compress_capacity
+            if type(self.encrypter) == IterativeAffineEncrypt:
+                capacity = 1  # iterative affine only support gh packing
+            para = {'padding_bit_len': padding_bit_len, 'max_capacity': capacity}
+            self.transfer_inst.cipher_compressor_para.remote(para, idx=-1)
+            LOGGER.info('sending compressing para {}'.format(para))
+            pack_func = functools.partial(self.packer.pack, encrypter=self.encrypter)
+            pack_gh = self.grad_and_hess.mapValues(pack_func)
+            en_grad_hess = pack_gh
         else:
-            LOGGER.info('sedding g/h to host')
             en_grad_hess = self.encrypted_mode_calculator.encrypt(self.grad_and_hess)
 
+        LOGGER.info('sending g/h to host')
         self.transfer_inst.encrypted_grad_and_hess.remote(en_grad_hess,
                                                           role=consts.HOST,
                                                           idx=idx)
