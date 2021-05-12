@@ -121,6 +121,7 @@ class HeteroSecureBoostingTreeGuest(HeteroBoostingGuest):
                   data_bin=self.data_bin, bin_split_points=self.bin_split_points, bin_sparse_points=self.bin_sparse_points,
                   grad_and_hess=g_h,
                   encrypter=self.encrypter, encrypted_mode_calculator=self.encrypted_calculator,
+                  task_type=self.task_type,
                   valid_features=self.sample_valid_features(),
                   host_party_list=self.component_properties.host_party_idlist,
                   runtime_idx=self.component_properties.local_partyid,

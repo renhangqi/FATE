@@ -37,6 +37,7 @@ class HeteroDecisionTreeGuest(DecisionTree):
         self.top_rate, self.other_rate = 0.2, 0.1  # goss sampling rate
 
         # cipher compressing
+        self.task_type = None
         self.run_cipher_compressing = True
         self.packer = None
         self.max_sample_weight = 1
@@ -110,6 +111,7 @@ class HeteroDecisionTreeGuest(DecisionTree):
              grad_and_hess,
              encrypter, encrypted_mode_calculator,
              host_party_list,
+             task_type,
              complete_secure=False,
              goss_subsample=False,
              top_rate=0.1,
@@ -134,6 +136,8 @@ class HeteroDecisionTreeGuest(DecisionTree):
 
         self.run_cipher_compressing = cipher_compressing
         self.max_sample_weight = max_sample_weight
+
+        self.task_type = task_type
 
         if self.run_goss:
             self.goss_sampling()
@@ -393,7 +397,7 @@ class HeteroDecisionTreeGuest(DecisionTree):
         if self.run_cipher_compressing:
 
             pos_max, neg_min = get_homo_encryption_max_int(self.encrypter)
-            self.packer = GHPacker(pos_max=pos_max, sample_num=self.data_bin.count(), )
+            self.packer = GHPacker(pos_max=pos_max, sample_num=self.data_bin.count(), task_type=self.task_type)
             padding_bit_len, capacity = self.packer.total_bit_len, self.packer.cipher_compress_capacity
 
             if type(self.encrypter) == IterativeAffineEncrypt:
