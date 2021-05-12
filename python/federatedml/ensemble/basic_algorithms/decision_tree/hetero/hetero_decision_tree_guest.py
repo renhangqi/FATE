@@ -392,7 +392,7 @@ class HeteroDecisionTreeGuest(DecisionTree):
     Federation Functions
     """
 
-    def process_and_sync_grad_and_hess(self, idx=-1):
+    def init_packer_and_sync_gh(self, idx=-1):
 
         if self.run_cipher_compressing:
 
@@ -712,7 +712,7 @@ class HeteroDecisionTreeGuest(DecisionTree):
 
         LOGGER.info('fitting a guest decision tree')
 
-        self.process_and_sync_grad_and_hess()
+        self.init_packer_and_sync_gh()
         root_node = self.initialize_root_node()
         self.cur_layer_nodes = [root_node]
         self.inst2node_idx = self.assign_instance_to_root_node(self.data_bin, root_node_id=root_node.id)

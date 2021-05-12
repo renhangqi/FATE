@@ -206,8 +206,12 @@ class HeteroDecisionTreeHost(DecisionTree):
     Federation Functions
     """
 
-    def sync_encrypted_grad_and_hess(self):
+    def init_compressor_and_sync_gh(self):
         LOGGER.info("get encrypted grad and hess")
+        if self.run_cipher_compressing:
+            para = self.transfer_inst.cipher_compressor_para.get(idx=0)
+            padding_bit_len, max_capacity = para['padding_bit_len'], para['max_capacity']
+            self.cipher_compressor = PackedGHCompressor(padding_bit_len=padding_bit_len, max_capacity=max_capacity)
         self.grad_and_hess = self.transfer_inst.encrypted_grad_and_hess.get(idx=0)
 
     def sync_node_positions(self, dep=-1):
@@ -369,12 +373,6 @@ class HeteroDecisionTreeHost(DecisionTree):
     Pre-Process / Post-Process
     """
 
-    def init_compressor(self):
-
-        para = self.transfer_inst.cipher_compressor_para.get(idx=0)
-        padding_bit_len, max_capacity = para['padding_bit_len'], para['max_capacity']
-        self.cipher_compressor = PackedGHCompressor(padding_bit_len=padding_bit_len, max_capacity=max_capacity)
-
     def remove_duplicated_split_nodes(self, split_nid_used):
         LOGGER.info("remove duplicated nodes from split mask dict")
         duplicated_nodes = set(self.split_maskdict.keys()) - set(split_nid_used)
@@ -488,9 +486,7 @@ class HeteroDecisionTreeHost(DecisionTree):
         
         LOGGER.info("begin to fit host decision tree")
 
-        if self.run_cipher_compressing:
-            self.init_compressor()
-        self.sync_encrypted_grad_and_hess()
+        self.init_compressor_and_sync_gh()
 
         for dep in range(self.max_depth):
 

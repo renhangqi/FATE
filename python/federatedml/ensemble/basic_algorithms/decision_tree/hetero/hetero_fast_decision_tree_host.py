@@ -223,7 +223,6 @@ class HeteroFastDecisionTreeHost(HeteroDecisionTreeHost):
                 new_tree_node_queue.append(right_node)
 
                 self.cur_layer_nodes[i].sitename = split_info[i].sitename
-
                 self.cur_layer_nodes[i].fid = split_info[i].best_fid
                 self.cur_layer_nodes[i].bid = split_info[i].best_bid
                 self.cur_layer_nodes[i].missing_dir = split_info[i].missing_dir
@@ -394,7 +393,7 @@ class HeteroFastDecisionTreeHost(HeteroDecisionTreeHost):
 
         LOGGER.debug('use local host feature to build tree')
 
-        self.sync_encrypted_grad_and_hess()
+        self.init_compressor_and_sync_gh()
         root_sum_grad, root_sum_hess = self.sync_en_g_sum_h_sum()
         self.inst2node_idx = self.assign_instance_to_root_node(self.data_bin,
                                                                root_node_id=0)  # root node id is 0
@@ -507,7 +506,7 @@ class HeteroFastDecisionTreeHost(HeteroDecisionTreeHost):
 
         self.initialize_node_plan()
 
-        self.sync_encrypted_grad_and_hess()
+        self.init_compressor_and_sync_gh()
 
         for dep in range(self.max_depth):
 

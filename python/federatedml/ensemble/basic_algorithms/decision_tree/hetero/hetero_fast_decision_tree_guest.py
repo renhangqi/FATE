@@ -116,12 +116,8 @@ class HeteroFastDecisionTreeGuest(HeteroDecisionTreeGuest):
 
             split_info_table = self.transfer_inst.encrypted_splitinfo_host.get(idx=target_host_idx, suffix=(dep, batch_idx))
 
-            if self.run_cipher_compressing:
-                self.cipher_decompressor.renew_decompressor(node_map)
-            cipher_decompressor = self.cipher_decompressor if self.run_cipher_compressing else None
             host_split_info = self.splitter.find_host_best_split_info(split_info_table, self.get_host_sitename(target_host_idx),
-                                                                      self.encrypter,
-                                                                      cipher_decompressor=cipher_decompressor)
+                                                                      self.encrypter, gh_packer=self.packer)
 
             split_info_list = [None for i in range(len(host_split_info))]
             for key in host_split_info:
@@ -221,7 +217,7 @@ class HeteroFastDecisionTreeGuest(HeteroDecisionTreeGuest):
         LOGGER.info('running layered mode')
 
         self.initialize_node_plan()
-        self.process_and_sync_grad_and_hess()
+        self.init_packer_and_sync_gh()
         root_node = self.initialize_root_node()
         self.cur_layer_nodes = [root_node]
         self.inst2node_idx = self.assign_instance_to_root_node(self.data_bin, root_node_id=root_node.id)
@@ -285,7 +281,7 @@ class HeteroFastDecisionTreeGuest(HeteroDecisionTreeGuest):
         self.initialize_node_plan()
 
         if self.tree_type != plan.tree_type_dict['guest_feat_only']:
-            self.process_and_sync_grad_and_hess(idx=self.host_id_to_idx(self.target_host_id))
+            self.init_packer_and_sync_gh(idx=self.host_id_to_idx(self.target_host_id))
             self.sync_en_g_sum_h_sum()
         else:
             root_node = self.initialize_root_node()
