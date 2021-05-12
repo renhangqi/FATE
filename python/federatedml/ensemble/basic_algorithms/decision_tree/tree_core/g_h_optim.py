@@ -79,6 +79,9 @@ class GHPacker(object):
         self.exponent = FixedPointNumber.encode(0, precision=precision).exponent
         self.precision = precision
 
+        LOGGER.debug('total bit len is {}, g offset is {}, g max is {}'.
+                     format(self.total_bit_len, self.g_offset, self.g_max))
+
     def _bit_assign_suggest(self, max_pos: int, sample_num: int, precision=2 ** 53):
 
         pos_bit_len = max_pos.bit_length()
