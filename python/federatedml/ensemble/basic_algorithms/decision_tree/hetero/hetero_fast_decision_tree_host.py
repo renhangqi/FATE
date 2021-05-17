@@ -144,10 +144,6 @@ class HeteroFastDecisionTreeHost(HeteroDecisionTreeHost):
                                                        sparse_opt=self.run_sparse_opt, hist_sub=True,
                                                        bin_num=self.bin_num)
 
-            if self.run_cipher_compressing:
-                self.cipher_compressor.renew_compressor(node_sample_count, node_map)
-            cipher_compressor = self.cipher_compressor if self.run_cipher_compressing else None
-
             split_info_table = self.splitter.host_prepare_split_points(histograms=acc_histograms,
                                                                        use_missing=self.use_missing,
                                                                        valid_features=self.valid_features,
@@ -156,7 +152,7 @@ class HeteroFastDecisionTreeHost(HeteroDecisionTreeHost):
                                                                        right_missing_dir=self.missing_dir_mask_right[dep],
                                                                        mask_id_mapping=self.fid_bid_random_mapping,
                                                                        batch_size=self.bin_num,
-                                                                       cipher_compressor=cipher_compressor,
+                                                                       cipher_compressor=self.cipher_compressor,
                                                                        shuffle_random_seed=np.abs(hash((dep, batch)))
                                                                        )
 
