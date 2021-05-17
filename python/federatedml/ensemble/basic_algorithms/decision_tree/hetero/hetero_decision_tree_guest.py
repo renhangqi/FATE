@@ -416,6 +416,8 @@ class HeteroDecisionTreeGuest(DecisionTree):
 
         else:
             en_grad_hess = self.encrypted_mode_calculator.encrypt(self.grad_and_hess)
+            LOGGER.debug('self grad and hess count {} {}'.format(en_grad_hess.count()
+                                                                 , self.grad_and_hess.count()))
 
         LOGGER.info('sending g/h to host')
         self.transfer_inst.encrypted_grad_and_hess.remote(en_grad_hess,
@@ -747,6 +749,7 @@ class HeteroDecisionTreeGuest(DecisionTree):
                 split_info.extend(cur_splitinfos)
 
             self.update_tree(split_info, False)
+            LOGGER.debug('split info is {}'.format(split_info))
             self.assign_instances_to_new_node(dep)
 
         if self.cur_layer_nodes:

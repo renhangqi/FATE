@@ -487,6 +487,7 @@ class HeteroDecisionTreeHost(DecisionTree):
         LOGGER.info("begin to fit host decision tree")
 
         self.init_compressor_and_sync_gh()
+        LOGGER.debug('grad and hess count {}'.format(self.grad_and_hess.count()))
 
         for dep in range(self.max_depth):
 

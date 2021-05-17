@@ -8,6 +8,7 @@ from federatedml.util import consts
 from federatedml.util import LOGGER
 
 precision = 2**53
+REGRESSION_MAX_GRADIENT = 10**9
 
 
 class SplitInfoPackage(NormalCipherPackage):
@@ -65,7 +66,7 @@ class GHPacker(object):
             g_min = -1.0
             h_max = 1.0
         elif task_type == consts.REGRESSION:
-            g_max = 10 ** 9  # assign a large value for regression gradients
+            g_max = REGRESSION_MAX_GRADIENT  # assign a large value for regression gradients
             g_min = -g_max
             h_max = 2.0
         else:
@@ -138,6 +139,8 @@ class GHPacker(object):
     def pack_func(gh, mul, g_modulo, h_modulo, offset, g_offset, ret_fixed_point=False, exponent=0, n=0):
 
         g, h = gh[0], gh[1]
+        if abs(g) >= REGRESSION_MAX_GRADIENT:
+            g = REGRESSION_MAX_GRADIENT
         g += g_offset  # to positive
         g_encoding = GHPacker.encode(g, mul, g_modulo)
         h_encoding = GHPacker.encode(h, mul, h_modulo)
