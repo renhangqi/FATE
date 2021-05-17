@@ -1,3 +1,4 @@
+import functools
 from federatedml.secureprotol.fixedpoint import FixedPointNumber
 from federatedml.secureprotol import PaillierEncrypt, IterativeAffineEncrypt
 from federatedml.secureprotol.fate_paillier import PaillierEncryptedNumber
@@ -30,8 +31,8 @@ class SplitInfoPackage(NormalCipherPackage):
     def has_space(self):
         return self._capacity_left - 1 >= 0  # g and h
 
-    def unpack(self, decrypter):
-        unpack_rs = super(SplitInfoPackage, self).unpack(decrypter)
+    def unpack(self, decrypter, raw_decrypt=False):
+        unpack_rs = super(SplitInfoPackage, self).unpack(decrypter, raw_decrypt=raw_decrypt)
         for split_info, g_h in zip(self._split_info_without_gh, unpack_rs):
             split_info.sum_grad = g_h
 
@@ -63,10 +64,12 @@ class GHPacker(object):
             g_max = 1.0
             g_min = -1.0
             h_max = 1.0
-        else:
-            g_max = 10 ** 9
+        elif task_type == consts.REGRESSION:
+            g_max = 10 ** 9  # assign a large value for regression gradients
             g_min = -g_max
             h_max = 2.0
+        else:
+            raise ValueError('unknown task type {}'.format(task_type))
 
         self.g_max, self.g_min, self.h_max = g_max * max_sample_weight, g_min * max_sample_weight, h_max * max_sample_weight
         self.g_offset = abs(self.g_min)
@@ -112,11 +115,10 @@ class GHPacker(object):
     def raw_encrypt(plaintext, encrypter, exponent):
 
         if type(encrypter) == PaillierEncrypt:
-            ciphertext = encrypter.public_key.raw_encrypt(plaintext)
-            paillier_num = PaillierEncryptedNumber(encrypter.public_key, ciphertext, exponent)
+            paillier_num = encrypter.raw_encrypt(plaintext, exponent)
             return paillier_num
         elif type(encrypter) == IterativeAffineEncrypt:
-            affine_cipher = encrypter.key.raw_encrypt(plaintext)
+            affine_cipher = encrypter.raw_encrypt(plaintext)
             return affine_cipher
         else:
             raise ValueError('unknown encryption type :{}'.format(type(encrypter)))
@@ -124,14 +126,7 @@ class GHPacker(object):
     @staticmethod
     def raw_decrypt(cipher, encrypter):
 
-        if type(encrypter) == PaillierEncrypt:
-            decrypt_rs = encrypter.privacy_key.raw_decrypt(cipher.ciphertext())
-            return decrypt_rs
-        elif type(encrypter) == IterativeAffineEncrypt:
-            decrypt_rs = encrypter.key.raw_decrypt(cipher)
-        else:
-            raise ValueError('unknown encryption type :{}'.format(type(encrypter)))
-
+        decrypt_rs = encrypter.raw_decrypt(cipher)
         return decrypt_rs
 
     @staticmethod
@@ -139,16 +134,20 @@ class GHPacker(object):
         int_fixpoint = int(round(num * mul))
         return int_fixpoint % modulo
 
-    def pack_func(self, gh, mul, g_modulo, h_modulo, offset):
+    @staticmethod
+    def pack_func(gh, mul, g_modulo, h_modulo, offset, g_offset, ret_fixed_point=False, exponent=0, n=0):
 
         g, h = gh[0], gh[1]
-        g += self.g_offset  # to positive
-        g_encoding = self.encode(g, mul, g_modulo)
-        h_encoding = self.encode(h, mul, h_modulo)
+        g += g_offset  # to positive
+        g_encoding = GHPacker.encode(g, mul, g_modulo)
+        h_encoding = GHPacker.encode(h, mul, h_modulo)
         pack_num = (g_encoding << offset) + h_encoding
+        if ret_fixed_point:
+            pack_num = FixedPointNumber(encoding=pack_num, exponent=exponent, n=n)
         return pack_num
 
-    def unpack_func(self, g_h_plain_text, h_assign_bit, g_modulo, g_max_int, h_modulo, h_max_int, exponent):
+    @staticmethod
+    def unpack_func(g_h_plain_text, h_assign_bit, g_modulo, g_max_int, h_modulo, h_max_int, exponent):
 
         g = g_h_plain_text >> h_assign_bit
         g = g % g_modulo
@@ -163,7 +162,7 @@ class GHPacker(object):
 
         exponent = FixedPointNumber.encode(0, self.g_modulo, self.g_max_int, precision).exponent
         mul = pow(FixedPointNumber.BASE, exponent)
-        pack_num = self.pack_func(gh, mul, self.g_modulo, self.h_modulo, self.offset)
+        pack_num = self.pack_func(gh, mul, self.g_modulo, self.h_modulo, self.offset, self.g_offset)
         return pack_num
 
     def unpack(self, en_num, encrypter, offset_sample_num, remove_offset=True):
@@ -179,9 +178,31 @@ class GHPacker(object):
 
         exponent = FixedPointNumber.encode(0, self.g_modulo, self.g_max_int, precision).exponent
         mul = pow(FixedPointNumber.BASE, exponent)
-        pack_num = self.pack_func(gh, mul, self.g_modulo, self.h_modulo, self.offset)
+        pack_num = self.pack_func(gh, mul, self.g_modulo, self.h_modulo, self.offset, self.g_offset)
         encrypt_num = self.raw_encrypt(pack_num, encrypter, exponent=exponent)
         return encrypt_num, 0
+
+    def pack_and_encrypt_2(self, gh_table, encrypt_calculator):
+
+        exponent = FixedPointNumber.encode(0, self.g_modulo, self.g_max_int, precision).exponent
+        mul = pow(FixedPointNumber.BASE, exponent)
+        ret_fixed_point = False
+        paillier_n = 0
+        if encrypt_calculator.mode != 'strict':
+            if type(encrypt_calculator.encrypter) == PaillierEncrypt:
+                ret_fixed_point = True
+                paillier_n = encrypt_calculator.encrypter.public_key.n
+            else:
+                raise ValueError("non paillier encryption does not support 'fast' or 'strict' mode")
+
+        pack_func = functools.partial(self.pack_func, mul=mul, g_modulo=self.g_modulo, h_modulo=self.h_modulo,
+                                      offset=self.offset, g_offset=self.g_offset,
+                                      ret_fixed_point=ret_fixed_point,
+                                      exponent=exponent, n=paillier_n)
+        pack_gh_table = gh_table.mapValues(pack_func)
+        rs_table = encrypt_calculator.raw_encrypt(pack_gh_table, exponent=exponent)
+        rs_table = rs_table.mapValues(lambda x: (x, 0))
+        return rs_table
 
     def decompress_and_unpack(self, split_info_package_list, encrypter):
 
@@ -223,5 +244,5 @@ class PackedGHDecompressor(object):
     def unpack_split_info(self, packages):
         rs_list = []
         for p in packages:
-            rs_list.extend(p.unpack_func(self.encrypter))
+            rs_list.extend(p.unpack(self.encrypter, raw_decrypt=True))
         return rs_list
