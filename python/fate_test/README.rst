@@ -806,7 +806,9 @@ generate command options
 
       fate_test data generate -i <path1 contains *testsuite.json | *benchmark.json>
 
-   will generate dataset in testsuites in *path1*; note that only one of ``type`` and ``include`` is needed
+   will generate dataset(s) with csv file name(s) in testsuites in *path1* with
+   specified entry count, number of features, and other configurations
+
 
 2. host-data-type:
 
@@ -830,7 +832,7 @@ generate command options
 
       fate_test data generate -i <path1 contains *testsuite.json | *benchmark.json> -p {sha256 | md5}
 
-   will generate dataset in testsuites in *path1* with hash id using SHA256 method
+   will generate dataset in testsuites in *path1* with id processed by specified hashing method
 
 5. match-rate:
 
@@ -854,7 +856,8 @@ generate command options
 
       fate_test suite -i <path1 contains *testsuite.json | *benchmark.json> -nh 10000
 
-   will generate dataset in testsuites *path1* where host data have 10000 entries
+   will generate dataset in testsuites *path1* where host data have 10000 entries;
+   if unspecified, this value will take `guest-data-size`
 
 8. guest-feature-num:
 
@@ -895,7 +898,7 @@ generate command options
 
        fate_test suite -i <path1 contains *testsuite.json | *benchmark.json> -nh 10000 --split-host
 
-    will generate dataset in testsuites *path1*; 10000 entries will be divided equally among all host data sets
+    will generate dataset in testsuites *path1*; 10000 entries will be divided equally among all host data sets in each testsuite
 
 13. upload-data
 
@@ -911,7 +914,7 @@ generate command options
 
        fate_test suite -i <path1 contains *testsuite.json | *benchmark.json> --remove-data
 
-    (effective with ``upload-data`` set to True) will delete generated data after generate and upload dataset in testsuites *path1*
+    (effective when ``upload-data`` set to True) will delete generated data after generate and upload dataset in testsuites *path1*
 
 15. use-local-data
 
@@ -919,7 +922,7 @@ generate command options
 
        fate_test suite -i <path1 contains *testsuite.json | *benchmark.json> --use-local-data
 
-    (effective with ``upload-data`` set to True) will generate dataset in testsuites *path1* and upload data from local server;
+    (effective when ``upload-data`` set to True) will generate dataset in testsuites *path1* and upload data from local server;
     use this option if flow and data storage are deployed to the same server
 
 
