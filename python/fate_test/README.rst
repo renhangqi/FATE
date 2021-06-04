@@ -925,6 +925,16 @@ generate command options
     (effective when ``upload-data`` set to True) will generate dataset in testsuites *path1* and upload data from local server;
     use this option if flow and data storage are deployed to the same server
 
+:Example:
+Below command will generate data sets for host and guest as listed in testsuite locates at given folder.
+- All host data sets will be of dense-format, with 10000 entries and 1 feature.
+- All guest data sets will be of dense-format, with 1000 entries and 5 features.
+Each host and guest data set pair will have 0.5 intersection rate.
+
+.. code-block:: bash
+
+      fate_test data generate -i examples/pipeline/intersect -ht dense -m 0.5 ng 1000 -nh 10000 -fg 5 -fh 1
+
 
 full command options
 ---------------------
