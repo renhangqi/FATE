@@ -927,6 +927,7 @@ generate command options
 
 :Example:
 Below command will generate data sets for host and guest as listed in testsuite locates at given folder.
+
 - All host data sets will be of dense-format, with 10000 entries and 1 feature.
 - All guest data sets will be of dense-format, with 1000 entries and 5 features.
 Each host and guest data set pair will have 0.5 intersection rate.
