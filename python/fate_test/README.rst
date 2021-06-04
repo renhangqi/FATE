@@ -926,15 +926,18 @@ generate command options
     use this option if flow and data storage are deployed to the same server
 
 :Example:
-Below command will generate data sets for host and guest as listed in testsuite locates at given folder.
+Below command will generate data sets for host and guest as listed in the testsuite locates at given folder.
 
 - All host data sets will be of dense-format, with 10000 entries and 1 feature.
 - All guest data sets will be of dense-format, with 1000 entries and 5 features.
+
 Each host and guest data set pair will have 0.5 intersection rate.
+
+By setting `upload-data`, data will be automatically uploaded to storage after generation.
 
 .. code-block:: bash
 
-      fate_test data generate -i examples/pipeline/intersect -ht dense -m 0.5 ng 1000 -nh 10000 -fg 5 -fh 1
+      fate_test data generate -i examples/pipeline/intersect -ht dense -m 0.5 ng 1000 -nh 10000 -fg 5 -fh 1 --upload
 
 
 full command options
