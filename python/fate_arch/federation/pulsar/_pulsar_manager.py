@@ -10,6 +10,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from fate_arch.common.log import getLogger
+from fate_arch.federation.pulsar._mq_channel import DEFAULT_SUBSCRIPTION_NAME
 
 logger = getLogger()
 
@@ -200,3 +201,9 @@ class PulsarManager():
         )
 
         return response
+
+    def unsubscribe_topic(self, tenant: str, namespace: str, topic: str, subscription_name: str):
+        session = self._create_session()
+        response = session.delete(
+            self.service_url + 'persistent/{}/{}/{}/subscription/{}'.format(tenant, namespace, topic, subscription_name)
+        )

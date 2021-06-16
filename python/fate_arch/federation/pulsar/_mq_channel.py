@@ -79,6 +79,7 @@ class MQChannel(object):
     def party_id(self):
         return self._party_id
 
+    # splitting the creation of producer and producer to avoid resource wasted
     @connection_retry
     def basic_publish(self, body, properties):
         self._get_or_create_producer()
@@ -110,13 +111,15 @@ class MQChannel(object):
             self._consumer_receive.negative_acknowledge(message)
 
     def cancel(self):
-        # self._get_or_create_consumer()
-        # self._get_or_create_producer()
         try:
             self._consumer_conn.close()
+        except Exception as e:
+            LOGGER.debug('meet {} when trying to close consumer'.format(e))
+
+        try:
             self._producer_conn.close()
         except Exception as e:
-            LOGGER.debug('meet {} when trying to close client'.format(e))
+            LOGGER.debug('meet {} when trying to close producer'.format(e))
 
     @connection_retry
     def _get_or_create_producer(self):

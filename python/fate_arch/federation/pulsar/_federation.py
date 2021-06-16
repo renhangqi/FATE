@@ -20,7 +20,7 @@ from fate_arch.common import Party
 from fate_arch.common.log import getLogger
 from fate_arch.computing.spark import get_storage_level, Table
 from fate_arch.computing.spark._materialize import materialize
-from fate_arch.federation.pulsar._mq_channel import MQChannel, DEFAULT_TENANT, DEFAULT_CLUSTER
+from fate_arch.federation.pulsar._mq_channel import MQChannel, DEFAULT_TENANT, DEFAULT_CLUSTER, DEFAULT_SUBSCRIPTION_NAME
 from fate_arch.federation.pulsar._pulsar_manager import PulsarManager
 from fate_arch.federation.rabbitmq._federation import Datastream
 
@@ -36,6 +36,8 @@ class FederationDataType(object):
     OBJECT = 'obj'
     TABLE = 'Table'
 
+# to create pulsar client
+
 
 class MQ(object):
     def __init__(self, host, port, route_table):
@@ -50,6 +52,8 @@ class MQ(object):
 
     def __repr__(self):
         return self.__str__()
+
+# to locate pulsar topic
 
 
 class _TopicPair(object):
@@ -150,6 +154,8 @@ class Federation(FederationABC):
                 LOGGER.debug(
                     f"[pulsar.get] _name_dtype_keys: {_name_dtype_keys}, dtype: {obj}")
 
+            self._unsubscribe_topics(party_topic_infos)
+
             for k in _name_dtype_keys:
                 if k not in self._name_dtype_map:
                     self._name_dtype_map[k] = rtn_dtype[0]
@@ -161,13 +167,13 @@ class Federation(FederationABC):
         partitions = rtn_dtype.get("partitions", None)
 
         if dtype == FederationDataType.TABLE:
-            party_topic_info = self._get_party_topic_infos(
+            party_topic_infos = self._get_party_topic_infos(
                 parties, name, partitions=partitions)
-            for i in range(len(party_topic_info)):
+            for i in range(len(party_topic_infos)):
                 party = parties[i]
                 role = party.role
                 party_id = party.party_id
-                topic_infos = party_topic_info[i]
+                topic_infos = party_topic_infos[i]
                 receive_func = self._get_partition_receive_func(name, tag, party_id, role, topic_infos, mq=self._mq,
                                                                 conf=self._pulsar_manager.runtime_config)
 
@@ -177,11 +183,15 @@ class Federation(FederationABC):
                 rdd = materialize(rdd)
                 table = Table(rdd)
                 rtn.append(table)
-                # add gc
-                gc.add_gc_action(tag, table, '__del__', {})
 
+            # add gc
+            # 1. spark
+                gc.add_gc_action(tag, table, '__del__', {})
                 LOGGER.debug(
                     f"[{log_str}]received rdd({i + 1}/{len(parties)}), party: {parties[i]} ")
+
+            # 2. remove pulsar resource, no need to use rdd
+            self._unsubscribe_topics(party_topic_infos)
         else:
             party_topic_infos = self._get_party_topic_infos(parties, name)
             channel_infos = self._get_channels(
@@ -192,7 +202,10 @@ class Federation(FederationABC):
                     f"[{log_str}]received obj({i + 1}/{len(parties)}), party: {parties[i]} ")
                 rtn.append(obj)
 
+            self._unsubscribe_topics(party_topic_infos)
+
         LOGGER.debug(f"[{log_str}]finish to get")
+        LOGGER.debug(f"[{log_str}]unsubscribe topic ")
         return rtn
 
     def remote(self, v, name: str, tag: str, parties: typing.List[Party],
@@ -631,3 +644,12 @@ class Federation(FederationABC):
             else:
                 ValueError(
                     f"[pulsar._partition_receive]properties.content_type is {properties.content_type}, but must be application/json")
+
+    def _unsubscribe_topics(self, party_topic_infos):
+        for party_topic_info in party_topic_infos:
+            for topic_info in party_topic_info:
+                topic_pair = topic_info[1]
+                self._pulsar_manager.unsubscribe_topic(self._tenant, self._session_id, topic_pair.receive, DEFAULT_SUBSCRIPTION_NAME)
+                LOGGER.debug(
+                    f"[unsubscribe topic {self._session_id}/{topic_pair.receive}/{DEFAULT_SUBSCRIPTION_NAME}"
+                )
