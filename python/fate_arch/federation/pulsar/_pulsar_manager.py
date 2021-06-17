@@ -202,8 +202,17 @@ class PulsarManager():
 
         return response
 
+    def unsubscribe_namespace_all_topics(self, tenant: str, namespace: str, subscription_name: str):
+        session = self._create_session()
+        response = session.post(
+            self.service_url + 'namespaces/{}/{}/unsubscribe/{}'.format(tenant, namespace, subscription_name)
+        )
+        return response
+
+    # topic
     def unsubscribe_topic(self, tenant: str, namespace: str, topic: str, subscription_name: str):
         session = self._create_session()
         response = session.delete(
             self.service_url + 'persistent/{}/{}/{}/subscription/{}'.format(tenant, namespace, topic, subscription_name)
         )
+        return response

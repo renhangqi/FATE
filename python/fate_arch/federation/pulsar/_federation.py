@@ -40,9 +40,10 @@ class FederationDataType(object):
 
 
 class MQ(object):
-    def __init__(self, host, port, route_table):
+    def __init__(self, host, port, mng_port, route_table):
         self.host = host
         self.port = port
+        self.mng_port = mng_port
         self.route_table = route_table
 
     def __str__(self):
@@ -112,7 +113,7 @@ class Federation(FederationABC):
         if route_table_path is None:
             route_table_path = "conf/pulsar_route_table.yaml"
         route_table = file_utils.load_yaml_conf(conf_path=route_table_path)
-        mq = MQ(host, port, route_table)
+        mq = MQ(host, port, mng_port, route_table)
         return Federation(federation_session_id, party, mq, pulsar_manager, max_message_size, topic_ttl, cluster, tenant)
 
     def __init__(self, session_id, party: Party, mq: MQ,  pulsar_manager: PulsarManager, max_message_size, topic_ttl, cluster, tenant):
@@ -154,8 +155,6 @@ class Federation(FederationABC):
                 LOGGER.debug(
                     f"[pulsar.get] _name_dtype_keys: {_name_dtype_keys}, dtype: {obj}")
 
-            self._unsubscribe_topics(party_topic_infos)
-
             for k in _name_dtype_keys:
                 if k not in self._name_dtype_map:
                     self._name_dtype_map[k] = rtn_dtype[0]
@@ -184,14 +183,11 @@ class Federation(FederationABC):
                 table = Table(rdd)
                 rtn.append(table)
 
-            # add gc
-            # 1. spark
+                # add gc
+                # 1. spark
                 gc.add_gc_action(tag, table, '__del__', {})
                 LOGGER.debug(
                     f"[{log_str}]received rdd({i + 1}/{len(parties)}), party: {parties[i]} ")
-
-            # 2. remove pulsar resource, no need to use rdd
-            self._unsubscribe_topics(party_topic_infos)
         else:
             party_topic_infos = self._get_party_topic_infos(parties, name)
             channel_infos = self._get_channels(
@@ -201,11 +197,9 @@ class Federation(FederationABC):
                 LOGGER.debug(
                     f"[{log_str}]received obj({i + 1}/{len(parties)}), party: {parties[i]} ")
                 rtn.append(obj)
-
-            self._unsubscribe_topics(party_topic_infos)
+                self._unsubscribe_topic(info._receive_topic)
 
         LOGGER.debug(f"[{log_str}]finish to get")
-        LOGGER.debug(f"[{log_str}]unsubscribe topic ")
         return rtn
 
     def remote(self, v, name: str, tag: str, parties: typing.List[Party],
@@ -264,13 +258,16 @@ class Federation(FederationABC):
         LOGGER.debug(f"[{log_str}]finish to remote")
 
     def cleanup(self, parties):
-        # The idead cleanup strategy is to consume all message leave in topics,
+        # The idea cleanup strategy is to consume all message in topics,
         # and let pulsar cluster to collect the used topics.
 
-        # Now we just force to remove the namespace
+        # Remove all subscription
         LOGGER.debug("[pulsar.cleanup]start to cleanup...")
-        self._pulsar_manager.delete_namespace(
-            tenant=self._tenant, namespace=self._session_id, force=True)
+        response = self._pulsar_manager.unsubscribe_namespace_all_topics(
+            tenant=self._tenant, namespace=self._session_id,
+            subscription_name=DEFAULT_SUBSCRIPTION_NAME
+        )
+        LOGGER.debug(response.text)
 
     def _get_party_topic_infos(self, parties: typing.List[Party], name=None, partitions=None, dtype=None) -> typing.List:
         topic_infos = [self._get_or_create_topic(
@@ -407,6 +404,14 @@ class Federation(FederationABC):
                     else:
                         raise Exception(
                             "unable to create pulsar namespace with status code: {}".format(code))
+
+                    # set message ttl for the namespace
+                    if self._pulsar_manager.set_message_ttl(self._tenant, self._session_id, self._topic_ttl).ok and \
+                            self._pulsar_manager.set_subscription_expiration_time(self._tenant, self._session_id, self._topic_ttl).ok:
+                        LOGGER.debug(
+                            'successfully set message ttl to namespaces: {} about {} mintues'.format(
+                                self._session_id, self._topic_ttl)
+                        )
                 # update party to namespace
                 else:
                     if party.party_id != self._party.party_id:
@@ -425,14 +430,6 @@ class Federation(FederationABC):
                                         clusters, self._session_id)
                                 )
 
-                # set message ttl for the namespace
-                if self._pulsar_manager.set_message_ttl(self._tenant, self._session_id, self._topic_ttl).ok and \
-                        self._pulsar_manager.set_subscription_expiration_time(self._tenant, self._session_id, self._topic_ttl).ok:
-                    LOGGER.debug(
-                        'successfully set message ttl to namespaces: {} about {} mintues'.format(
-                            self._session_id, self._topic_ttl)
-                    )
-
                 self._topic_map[topic_key] = topic_pair
                 # TODO: check federated queue status
                 LOGGER.debug(
@@ -444,7 +441,7 @@ class Federation(FederationABC):
         return topic_infos
 
     def _get_channel(self, mq, topic_pair: _TopicPair, party_id, role, conf: dict):
-        return MQChannel(host=mq.host, port=mq.port, pulsar_tenant=topic_pair.tenant, pulsar_namespace=topic_pair.namespace,
+        return MQChannel(host=mq.host, port=mq.port, mng_port=mq.mng_port, pulsar_tenant=topic_pair.tenant, pulsar_namespace=topic_pair.namespace,
                          pulsar_send_topic=topic_pair.send, pulsar_receive_topic=topic_pair.receive,
                          party_id=party_id, role=role, credential=None, extra_args=conf)
 
@@ -640,16 +637,34 @@ class Federation(FederationABC):
 
                 if count == partition_size:
                     channel_info.cancel()
+                    self._unsubscribe_topic_without_manager(channel_info)
+                    # self._unsubscribe_topic(topic_pair.receive)
                     return all_data
             else:
                 ValueError(
                     f"[pulsar._partition_receive]properties.content_type is {properties.content_type}, but must be application/json")
 
+    def _unsubscribe_topic(self, topic_name):
+        self._pulsar_manager.unsubscribe_topic(
+            self._tenant, self._session_id, topic_name, DEFAULT_SUBSCRIPTION_NAME)
+        LOGGER.debug(
+            f"[unsubscribe topic {self._session_id}/{topic_name}/{DEFAULT_SUBSCRIPTION_NAME}"
+        )
+
     def _unsubscribe_topics(self, party_topic_infos):
         for party_topic_info in party_topic_infos:
             for topic_info in party_topic_info:
                 topic_pair = topic_info[1]
-                self._pulsar_manager.unsubscribe_topic(self._tenant, self._session_id, topic_pair.receive, DEFAULT_SUBSCRIPTION_NAME)
-                LOGGER.debug(
-                    f"[unsubscribe topic {self._session_id}/{topic_pair.receive}/{DEFAULT_SUBSCRIPTION_NAME}"
-                )
+                self._unsubscribe_topic(topic_pair.receive)
+
+    # this is used insied spark, which is required to create pulsar manager first
+    # the mq_channel is a MQChannel instance
+    def _unsubscribe_topic_without_manager(self, mq_channel):
+        pulsar_manager = PulsarManager(
+            host=mq_channel._host, port=mq_channel._mng_port)
+        pulsar_manager.unsubscribe_topic(
+            mq_channel._tenant, mq_channel._namespace, mq_channel._receive_topic, DEFAULT_SUBSCRIPTION_NAME)
+
+        print(
+            f"[unsubscribe topic {mq_channel._namespace}/{mq_channel._receive_topic}/{DEFAULT_SUBSCRIPTION_NAME}"
+        )

@@ -44,10 +44,11 @@ def connection_retry(func):
 
 class MQChannel(object):
     # TODO add credential to secure pulsar cluster
-    def __init__(self, host, port, pulsar_tenant, pulsar_namespace, pulsar_send_topic, pulsar_receive_topic, party_id, role, credential=None, extra_args: dict = None):
+    def __init__(self, host, port, mng_port, pulsar_tenant, pulsar_namespace, pulsar_send_topic, pulsar_receive_topic, party_id, role, credential=None, extra_args: dict = None):
         # "host:port" is used to connect the pulsar broker
         self._host = host
         self._port = port
+        self._mng_port = mng_port
         self._tenant = pulsar_tenant
         self._namespace = pulsar_namespace
         self._send_topic = pulsar_send_topic
