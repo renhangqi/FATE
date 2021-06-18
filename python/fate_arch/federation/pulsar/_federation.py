@@ -197,7 +197,7 @@ class Federation(FederationABC):
                 LOGGER.debug(
                     f"[{log_str}]received obj({i + 1}/{len(parties)}), party: {parties[i]} ")
                 rtn.append(obj)
-                self._unsubscribe_topic(info._receive_topic)
+                #self._unsubscribe_topic(info._receive_topic)
 
         LOGGER.debug(f"[{log_str}]finish to get")
         return rtn
@@ -665,7 +665,7 @@ class Federation(FederationABC):
 
                 if count == partition_size:
                     channel_info.cancel()
-                    self._unsubscribe_topic_without_manager(channel_info)
+                    #self._unsubscribe_topic_without_manager(channel_info)
                     # self._unsubscribe_topic(topic_pair.receive)
                     return all_data
             else:
