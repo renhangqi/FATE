@@ -34,8 +34,7 @@ def connection_retry(func):
                 break
             except Exception as e:
                 LOGGER.debug(e)
-
-                time.sleep(1)
+                time.sleep(3)
         return res
     return wrapper
 
