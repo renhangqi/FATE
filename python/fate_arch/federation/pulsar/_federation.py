@@ -273,15 +273,24 @@ class Federation(FederationABC):
         else:
             LOGGER.error(response.text)
 
-        # 2. clear all backlog ?
-
-        # 3. reset retention policy
+        # 2. reset retention policy
         response = self._pulsar_manager.set_retention(
             self._tenant, self._session_id, retention_time_in_minutes=0, retention_size_in_MB=0)
         if response.ok:
             LOGGER.debug("successfully reset all retention policy")
         else:
             LOGGER.error(response.text)
+
+        # 3. remove cluster from namespace
+        response = self._pulsar_manager.set_clusters_to_namespace(
+            self._tenant, self._session_id, [self._cluster])
+        if response.ok:
+	        LOGGER.debug("successfully reset all replicated cluster")
+        else:
+            LOGGER.error(response.text)
+
+        # 4. clear all backlog ?
+
 
     def _get_party_topic_infos(self, parties: typing.List[Party], name=None, partitions=None, dtype=None) -> typing.List:
         topic_infos = [self._get_or_create_topic(
