@@ -26,8 +26,8 @@ from fate_arch.federation.rabbitmq._federation import Datastream
 
 
 LOGGER = getLogger()
-# default message max size in bytes = 1MB
-DEFAULT_MESSAGE_MAX_SIZE = 104857 * 20
+# default message max size in bytes = 50MB
+DEFAULT_MESSAGE_MAX_SIZE = 104857 * 50
 NAME_DTYPE_TAG = '<dtype>'
 _SPLIT_ = '^'
 
@@ -261,13 +261,27 @@ class Federation(FederationABC):
         # The idea cleanup strategy is to consume all message in topics,
         # and let pulsar cluster to collect the used topics.
 
-        # Remove all subscription
         LOGGER.debug("[pulsar.cleanup]start to cleanup...")
+
+        # 1. remove subscription
         response = self._pulsar_manager.unsubscribe_namespace_all_topics(
             tenant=self._tenant, namespace=self._session_id,
             subscription_name=DEFAULT_SUBSCRIPTION_NAME
         )
-        LOGGER.debug(response.text)
+        if response.ok:
+            LOGGER.debug("successfully unsubscribe all topics")
+        else:
+            LOGGER.error(response.text)
+
+        # 2. clear all backlog ?
+
+        # 3. reset retention policy
+        response = self._pulsar_manager.set_retention(
+            self._tenant, self._session_id, retention_time_in_minutes=0, retention_size_in_MB=0)
+        if response.ok:
+            LOGGER.debug("successfully reset all retention policy")
+        else:
+            LOGGER.error(response.text)
 
     def _get_party_topic_infos(self, parties: typing.List[Party], name=None, partitions=None, dtype=None) -> typing.List:
         topic_infos = [self._get_or_create_topic(
@@ -406,12 +420,17 @@ class Federation(FederationABC):
                             "unable to create pulsar namespace with status code: {}".format(code))
 
                     # set message ttl for the namespace
-                    if self._pulsar_manager.set_message_ttl(self._tenant, self._session_id, self._topic_ttl).ok and \
-                            self._pulsar_manager.set_subscription_expiration_time(self._tenant, self._session_id, self._topic_ttl).ok:
+                    response = self._pulsar_manager.set_retention(self._tenant, self._session_id,
+                                                                  retention_time_in_minutes=int(self._topic_ttl), retention_size_in_MB=-1)
+
+                    LOGGER.debug(response.text)
+                    if response.ok:
                         LOGGER.debug(
-                            'successfully set message ttl to namespaces: {} about {} mintues'.format(
+                            'successfully set message ttl to namespace: {} about {} mintues'.format(
                                 self._session_id, self._topic_ttl)
                         )
+                    else:
+                        LOGGER.debug('failed to set message ttl to namespace')
                 # update party to namespace
                 else:
                     if party.party_id != self._party.party_id:
