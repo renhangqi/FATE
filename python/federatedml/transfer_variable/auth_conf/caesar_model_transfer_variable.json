@@ -1,0 +1,40 @@
+{
+  "federatedml.transfer_variable.transfer_class.caesar_model_transfer_variable.CaesarModelTransferVariable": {
+    "share_matrix": {
+      "src": [
+        "guest",
+        "host"
+      ],
+      "dst": [
+        "host",
+        "guest"
+      ]
+    },
+    "encrypted_share_matrix": {
+      "src": [
+        "guest",
+        "host"
+      ],
+      "dst": [
+        "host",
+        "guest"
+      ]
+    },
+    "share_error": {
+      "src": [
+        "host"
+      ],
+      "dst": [
+        "guest"
+      ]
+    },
+    "host_prob": {
+      "src": [
+        "host"
+      ],
+      "dst": [
+        "guest"
+      ]
+    }
+  }
+}

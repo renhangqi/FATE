@@ -14,20 +14,24 @@
 #  limitations under the License.
 #
 import operator
+from collections import Iterable
 
 import numpy as np
 
 from fate_arch.common import Party
 from fate_arch.session import is_table
 from federatedml.secureprotol.spdz.beaver_triples import beaver_triplets
-from federatedml.secureprotol.spdz.tensor.base import TensorBase
 from federatedml.secureprotol.spdz.tensor import fixedpoint_numpy
+from federatedml.secureprotol.spdz.tensor.base import TensorBase
 from federatedml.secureprotol.spdz.utils import NamingService
 from federatedml.secureprotol.spdz.utils.random_utils import urand_tensor
+from federatedml.util import LOGGER
+from federatedml.util import fate_operator
 
 
 def _table_binary_op(x, y, q_field, op):
-    return x.join(y, lambda a, b: op(a, b) % q_field)
+    # return x.join(y, lambda a, b: op(a, b) % q_field)
+    return x.join(y, lambda a, b: op(a, b))
 
 
 def _table_scalar_op(x, d, op):
@@ -37,10 +41,14 @@ def _table_scalar_op(x, d, op):
 def _table_dot_mod_func(it, q_field):
     ret = None
     for _, (x, y) in it:
+        # if ret is None:
+        #     ret = np.tensordot(x, y, [[], []]) % q_field
+        # else:
+        #     ret = (ret + np.tensordot(x, y, [[], []])) % q_field
         if ret is None:
-            ret = np.tensordot(x, y, [[], []]) % q_field
+            ret = np.tensordot(x, y, [[], []])
         else:
-            ret = (ret + np.tensordot(x, y, [[], []])) % q_field
+            ret = (ret + np.tensordot(x, y, [[], []]))
     return ret
 
 
@@ -97,6 +105,44 @@ class FixedPointTensor(TensorBase):
         share = fixedpoint_numpy.FixedPointTensor(cross, self.q_field, self.endec, target_name)
         return share
 
+    def dot_local(self, other: 'FixedPointTensor', target_name=None):
+        if target_name is None:
+            target_name = NamingService.get_instance().next()
+        if self.is_encrypted_number(self.value) or self.is_encrypted_number(other.value):
+            res = table_dot(self.value, other.value)
+            return fixedpoint_numpy.PaillierFixedPointTensor(res, self.q_field, self.endec, target_name)
+        else:
+            res = table_dot_mod(self.value, other.value, self.q_field)
+            return fixedpoint_numpy.FixedPointTensor(res, self.q_field, self.endec, target_name)
+
+    def dot_array(self, array):
+        party_idx = self.get_spdz().party_idx
+
+        def _dot(x):
+            res = fate_operator.vec_dot(x, array)
+            return np.array([res])
+
+            # if type(res).__name__ != "PaillierEncryptedNumber":
+            #     res = res % self.q_field
+            #     return self.endec.truncate(res, party_idx)
+            # else:
+            #     return np.array([res])
+
+        return self._boxed(self.value.mapValues(_dot))
+
+    @classmethod
+    def from_value(cls, value, **kwargs):
+        spdz = cls.get_spdz()
+        q_field = kwargs['q_field'] if 'q_field' in kwargs else spdz.q_field
+        if 'encoder' in kwargs:
+            encoder = kwargs['encoder']
+        else:
+            base = kwargs['base'] if 'base' in kwargs else 10
+            frac = kwargs['frac'] if 'frac' in kwargs else 4
+            encoder = fixedpoint_numpy.FixedPointEndec(q_field, base, frac)
+        tensor_name = kwargs.get("tensor_name")
+        return FixedPointTensor(value, q_field, encoder, tensor_name)
+
     @classmethod
     def from_source(cls, tensor_name, source, **kwargs):
         spdz = cls.get_spdz()
@@ -117,6 +163,16 @@ class FixedPointTensor(TensorBase):
                                                tensor_name=tensor_name, party=_party)
                 _pre = r
             share = _table_binary_op(source, _pre, spdz.q_field, operator.sub)
+        elif isinstance(source, np.ndarray):
+            source = encoder.encode(source)
+            _pre = urand_tensor(spdz.q_field, source, use_mix=spdz.use_mix_rand)
+            spdz.communicator.remote_share(share=_pre, tensor_name=tensor_name, party=spdz.other_parties[0])
+            for _party in spdz.other_parties[1:]:
+                r = urand_tensor(spdz.q_field, source, use_mix=spdz.use_mix_rand)
+                spdz.communicator.remote_share(share=(r - _pre) % spdz.q_field,
+                                               tensor_name=tensor_name, party=_party)
+                _pre = r
+            share = (source - _pre) % spdz.q_field
         elif isinstance(source, Party):
             share = spdz.communicator.get_share(tensor_name=tensor_name, party=source)[0]
         else:
@@ -124,6 +180,7 @@ class FixedPointTensor(TensorBase):
         return FixedPointTensor(share, spdz.q_field, encoder, tensor_name)
 
     def get(self, tensor_name=None):
+        LOGGER.debug(f"start get")
         return self.rescontruct(tensor_name)
 
     def rescontruct(self, tensor_name=None):
@@ -152,20 +209,63 @@ class FixedPointTensor(TensorBase):
     def as_name(self, tensor_name):
         return self._boxed(value=self.value, tensor_name=tensor_name)
 
+    @staticmethod
+    def is_encrypted_number(table):
+        value = table.first()[1]
+        while isinstance(value, Iterable):
+            value = value[0]
+        if type(value).__name__ == "PaillierEncryptedNumber":
+            return True
+        return False
+
     def __add__(self, other):
         if isinstance(other, FixedPointTensor):
             other = other.value
-        z_value = _table_binary_op(self.value, other, self.q_field, operator.add)
+        elif isinstance(other, (float, np.float)):
+            other = self.endec.encode(other)
+            z_value = _table_scalar_op(self.value, other, operator.add)
+            LOGGER.debug(f"z_value: {z_value.count()}, self.value: {self.value.count()}")
+            return self._boxed(z_value)
+        if self.is_encrypted_number(self.value) or self.is_encrypted_number(other):
+            z_value = self.value.join(other, operator.add)
+        else:
+            LOGGER.debug(f"before add, other: {other.first()}, self: {self.value.first()}")
+            z_value = _table_binary_op(self.value, other, self.q_field, operator.add)
+            LOGGER.debug(f"z_value: {z_value.count()}, self.value: {self.value.count()}, other:"
+                         f" {other.count()}")
+            assert z_value.count() != 0
         return self._boxed(z_value)
 
     def __sub__(self, other):
-        z_value = _table_binary_op(self.value, other.value, self.q_field, operator.sub)
+        if self.is_encrypted_number(self.value) or self.is_encrypted_number(other.value):
+            z_value = self.value.join(other.value, operator.sub)
+        else:
+            z_value = _table_binary_op(self.value, other.value, self.q_field, operator.sub)
         return self._boxed(z_value)
 
     def __mul__(self, other):
-        if not isinstance(other, (int, np.integer)):
+        if isinstance(other, (int, np.integer)):
+            if not self.is_encrypted_number(self.value):
+                # return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other) % self.q_field))
+                return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other)))
+
+            else:
+                return self._boxed(_table_scalar_op(self.value, other, operator.mul))
+        elif isinstance(other, FixedPointTensor):
+            if self.is_encrypted_number(self.value) or self.is_encrypted_number(other.value):
+                return self._boxed(self.value.join(other.value, operator.mul))
+            return self._boxed(_table_binary_op(self.value, other.value, self.q_field, operator.mul))
+        elif isinstance(other, (float, np.float)):
+            other = self.endec.encode(other)
+            LOGGER.debug(f'encoded other: {other}, {type(other)}')
+            if not self.is_encrypted_number(self.value):
+                # return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other) % self.q_field))
+                return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other)))
+
+            else:
+                return self._boxed(_table_scalar_op(self.value, other, operator.mul))
+        else:
             raise NotImplementedError("__mul__ support integer only")
-        return self._boxed(_table_scalar_op(self.value, other, operator.mul))
 
     def __mod__(self, other):
         if not isinstance(other, (int, np.integer)):
@@ -174,3 +274,49 @@ class FixedPointTensor(TensorBase):
 
     def _boxed(self, value, tensor_name=None):
         return FixedPointTensor(value=value, q_field=self.q_field, endec=self.endec, tensor_name=tensor_name)
+
+
+class PaillierFixedPointTensor(FixedPointTensor):
+
+    def dot_array(self, array):
+        def _dot(x):
+            res = fate_operator.vec_dot(x, array)
+            if not isinstance(res, np.ndarray):
+                res = np.array([res])
+            return res
+
+        return self._boxed(self.value.mapValues(_dot))
+
+    def __add__(self, other):
+        if isinstance(other, FixedPointTensor):
+            other = other.value
+            return self._boxed(self.value.join(other, operator.add))
+
+        if isinstance(other, (float, np.float)):
+            other = self.endec.encode(other)
+        z_value = _table_scalar_op(self.value, other, operator.add)
+        return self._boxed(z_value)
+
+    def __mul__(self, other):
+        if isinstance(other, (int, np.integer)):
+            return self._boxed(_table_scalar_op(self.value, other, operator.mul))
+        elif isinstance(other, FixedPointTensor):
+            return self._boxed(self.value.join(other.value, operator.mul))
+        elif isinstance(other, (float, np.float)):
+            other = self.endec.encode(other)
+            return self._boxed(_table_scalar_op(self.value, other, operator.mul))
+        else:
+            raise NotImplementedError(f"__mul__ not support type: {type(other)}")
+
+    def __sub__(self, other):
+        if isinstance(other, FixedPointTensor):
+            other = other.value
+            return self._boxed(self.value.join(other, operator.sub))
+
+        if isinstance(other, (float, np.float)):
+            other = self.endec.encode(other)
+        z_value = _table_scalar_op(self.value, other, operator.sub)
+        return self._boxed(z_value)
+
+    def _boxed(self, value, tensor_name=None):
+        return PaillierFixedPointTensor(value=value, q_field=self.q_field, endec=self.endec, tensor_name=tensor_name)
