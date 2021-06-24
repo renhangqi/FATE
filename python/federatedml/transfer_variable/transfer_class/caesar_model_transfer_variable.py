@@ -35,3 +35,4 @@ class CaesarModelTransferVariable(BaseTransferVariables):
                                                             dst=['host', "guest"])
         self.share_error = self._create_variable(name='share_error', src=["host"], dst=["guest"])
         self.host_prob = self._create_variable(name='host_prob', src=['host'], dst=['guest'])
+        self.pubkey = self._create_variable(name='pubkey', src=['guest', "host"], dst=['host', "guest"])

@@ -25,6 +25,7 @@ from federatedml.secureprotol.spdz.tensor import fixedpoint_numpy
 from federatedml.secureprotol.spdz.tensor.base import TensorBase
 from federatedml.secureprotol.spdz.utils import NamingService
 from federatedml.secureprotol.spdz.utils.random_utils import urand_tensor
+from federatedml.secureprotol.fixedpoint import FixedPointNumber
 from federatedml.util import LOGGER
 from federatedml.util import fate_operator
 
@@ -38,17 +39,17 @@ def _table_scalar_op(x, d, op):
     return x.mapValues(lambda a: op(a, d))
 
 
+def _table_scalar_mod_op(x, d, q_field, op):
+    return x.mapValues(lambda a: op(a, d) % q_field)
+
+
 def _table_dot_mod_func(it, q_field):
     ret = None
     for _, (x, y) in it:
-        # if ret is None:
-        #     ret = np.tensordot(x, y, [[], []]) % q_field
-        # else:
-        #     ret = (ret + np.tensordot(x, y, [[], []])) % q_field
         if ret is None:
-            ret = np.tensordot(x, y, [[], []])
+            ret = np.tensordot(x, y, [[], []]) % q_field
         else:
-            ret = (ret + np.tensordot(x, y, [[], []]))
+            ret = (ret + np.tensordot(x, y, [[], []])) % q_field
     return ret
 
 
@@ -108,25 +109,35 @@ class FixedPointTensor(TensorBase):
     def dot_local(self, other: 'FixedPointTensor', target_name=None):
         if target_name is None:
             target_name = NamingService.get_instance().next()
-        if self.is_encrypted_number(self.value) or self.is_encrypted_number(other.value):
-            res = table_dot(self.value, other.value)
-            return fixedpoint_numpy.PaillierFixedPointTensor(res, self.q_field, self.endec, target_name)
-        else:
-            res = table_dot_mod(self.value, other.value, self.q_field)
-            return fixedpoint_numpy.FixedPointTensor(res, self.q_field, self.endec, target_name)
+        # if self.is_encrypted_number(other.value):
+        #     res = table_dot(self.value, other.value)
+        #     return fixedpoint_numpy.PaillierFixedPointTensor(res, self.q_field, self.endec, target_name)
+        # else:
+        res = table_dot_mod(self.value, other.value, self.q_field)
+        return fixedpoint_numpy.FixedPointTensor(res, self.q_field, self.endec, target_name)
 
     def dot_array(self, array):
-        party_idx = self.get_spdz().party_idx
+        # party_idx = self.get_spdz().party_idx
 
         def _dot(x):
+            LOGGER.debug(f"in_dot, x:{x}, array: {array}")
             res = fate_operator.vec_dot(x, array)
-            return np.array([res])
 
-            # if type(res).__name__ != "PaillierEncryptedNumber":
-            #     res = res % self.q_field
-            #     return self.endec.truncate(res, party_idx)
-            # else:
-            #     return np.array([res])
+            if res > 1:
+                pass
+            else:
+                assert 1 == 2, f"Some debug log"
+
+            # res = 0
+            # for idx, xi in enumerate(x):
+            #     LOGGER.debug(f"idx: {idx},"
+            #                  f"xi: {xi.encoding}, {xi.exponent}, {xi.n}, {xi.max_int} "
+            #                  f"array: {array[idx].encoding}, {array[idx].exponent}")
+            #     res = res + xi * array[idx]
+            if not isinstance(res, np.ndarray):
+                res = np.array([res])
+            LOGGER.debug(f"dot_result: {self.endec.decode(res)}")
+            return res
 
         return self._boxed(self.value.mapValues(_dot))
 
@@ -141,7 +152,8 @@ class FixedPointTensor(TensorBase):
             frac = kwargs['frac'] if 'frac' in kwargs else 4
             encoder = fixedpoint_numpy.FixedPointEndec(q_field, base, frac)
         tensor_name = kwargs.get("tensor_name")
-        return FixedPointTensor(value, q_field, encoder, tensor_name)
+        # return FixedPointTensor(value, q_field, encoder, tensor_name)
+        return cls(value, q_field, encoder, tensor_name)
 
     @classmethod
     def from_source(cls, tensor_name, source, **kwargs):
@@ -218,54 +230,53 @@ class FixedPointTensor(TensorBase):
             return True
         return False
 
-    def __add__(self, other):
+    def _basic_op(self, other, op):
+        # if isinstance(other, (float, np.float)):
+        #     other = self.endec.encode(other)
+        #     z_value = _table_scalar_op(self.value, other, op)
+        #     return self._boxed(z_value)
+        if isinstance(other, (int, np.int, float, np.float, FixedPointNumber)):
+            z_value = _table_scalar_op(self.value, other, op)
+            return self._boxed(z_value)
+
         if isinstance(other, FixedPointTensor):
             other = other.value
-        elif isinstance(other, (float, np.float)):
-            other = self.endec.encode(other)
-            z_value = _table_scalar_op(self.value, other, operator.add)
-            LOGGER.debug(f"z_value: {z_value.count()}, self.value: {self.value.count()}")
-            return self._boxed(z_value)
-        if self.is_encrypted_number(self.value) or self.is_encrypted_number(other):
-            z_value = self.value.join(other, operator.add)
+
+        if self.is_encrypted_number(other):
+            z_value = self.value.join(other, op)
         else:
-            LOGGER.debug(f"before add, other: {other.first()}, self: {self.value.first()}")
-            z_value = _table_binary_op(self.value, other, self.q_field, operator.add)
+            LOGGER.debug(f"before op, other: {other.first()}, self: {self.value.first()}")
+            z_value = _table_binary_op(self.value, other, self.q_field, op)
             LOGGER.debug(f"z_value: {z_value.count()}, self.value: {self.value.count()}, other:"
                          f" {other.count()}")
-            assert z_value.count() != 0
         return self._boxed(z_value)
+
+    def __add__(self, other):
+        return self._basic_op(other, operator.add)
 
     def __sub__(self, other):
-        if self.is_encrypted_number(self.value) or self.is_encrypted_number(other.value):
-            z_value = self.value.join(other.value, operator.sub)
-        else:
-            z_value = _table_binary_op(self.value, other.value, self.q_field, operator.sub)
-        return self._boxed(z_value)
+        return self._basic_op(other, operator.sub)
 
     def __mul__(self, other):
-        if isinstance(other, (int, np.integer)):
-            if not self.is_encrypted_number(self.value):
-                # return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other) % self.q_field))
-                return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other)))
-
-            else:
-                return self._boxed(_table_scalar_op(self.value, other, operator.mul))
-        elif isinstance(other, FixedPointTensor):
-            if self.is_encrypted_number(self.value) or self.is_encrypted_number(other.value):
-                return self._boxed(self.value.join(other.value, operator.mul))
-            return self._boxed(_table_binary_op(self.value, other.value, self.q_field, operator.mul))
-        elif isinstance(other, (float, np.float)):
-            other = self.endec.encode(other)
-            LOGGER.debug(f'encoded other: {other}, {type(other)}')
-            if not self.is_encrypted_number(self.value):
-                # return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other) % self.q_field))
-                return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other)))
-
-            else:
-                return self._boxed(_table_scalar_op(self.value, other, operator.mul))
-        else:
-            raise NotImplementedError("__mul__ support integer only")
+        return self._basic_op(other, operator.mul)
+        # if isinstance(other, (int, np.integer)):
+        #     if not self.is_encrypted_number(self.value):
+        #         # return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other) % self.q_field))
+        #         return self._boxed(_table_scalar_mod_op(self.value, other, self.q_field, operator.mul))
+        #         # return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other)))
+        #     else:
+        #         return self._boxed(_table_scalar_op(self.value, other, operator.mul))
+        # elif isinstance(other, FixedPointTensor):
+        #     if self.is_encrypted_number(other.value):
+        #         return self._boxed(self.value.join(other.value, operator.mul))
+        #     else:
+        #         return self._boxed(_table_binary_op(self.value, other.value, self.q_field, operator.mul))
+        # elif isinstance(other, (float, np.float)):
+        #     other = self.endec.encode(other)
+        #     LOGGER.debug(f'encoded other: {other}, {type(other)}')
+        #     return self._boxed(_table_scalar_mod_op(self.value, other, self.q_field, operator.mul))
+        # else:
+        #     raise NotImplementedError(f"table tensor __mul__ do not support type: {type(other)}")
 
     def __mod__(self, other):
         if not isinstance(other, (int, np.integer)):
@@ -280,42 +291,36 @@ class PaillierFixedPointTensor(FixedPointTensor):
 
     def dot_array(self, array):
         def _dot(x):
-            res = fate_operator.vec_dot(x, array)
+            LOGGER.debug(f"In PaillierFixedPointTensor, x: {x}, array: {array}")
+            # res = fate_operator.vec_dot(x, array)
+            res = 0
+            for i, xi in enumerate(x):
+                # LOGGER.debug(f"xi: {xi}, array: {array[i].encoding}")
+                res += xi * array[i]
             if not isinstance(res, np.ndarray):
                 res = np.array([res])
             return res
 
         return self._boxed(self.value.mapValues(_dot))
 
-    def __add__(self, other):
-        if isinstance(other, FixedPointTensor):
-            other = other.value
-            return self._boxed(self.value.join(other, operator.add))
+    def dot_local(self, other: 'FixedPointTensor', target_name=None):
+        if target_name is None:
+            target_name = NamingService.get_instance().next()
+        res = table_dot(self.value, other.value)
+        return fixedpoint_numpy.PaillierFixedPointTensor(res, self.q_field, self.endec, target_name)
 
+    def _basic_op(self, other, op):
         if isinstance(other, (float, np.float)):
             other = self.endec.encode(other)
-        z_value = _table_scalar_op(self.value, other, operator.add)
-        return self._boxed(z_value)
+            z_value = _table_scalar_op(self.value, other, op)
+            return self._boxed(z_value)
+        elif isinstance(other, (int, np.int)):
+            z_value = _table_scalar_op(self.value, other, op)
+            return self._boxed(z_value)
 
-    def __mul__(self, other):
-        if isinstance(other, (int, np.integer)):
-            return self._boxed(_table_scalar_op(self.value, other, operator.mul))
-        elif isinstance(other, FixedPointTensor):
-            return self._boxed(self.value.join(other.value, operator.mul))
-        elif isinstance(other, (float, np.float)):
-            other = self.endec.encode(other)
-            return self._boxed(_table_scalar_op(self.value, other, operator.mul))
-        else:
-            raise NotImplementedError(f"__mul__ not support type: {type(other)}")
-
-    def __sub__(self, other):
         if isinstance(other, FixedPointTensor):
             other = other.value
-            return self._boxed(self.value.join(other, operator.sub))
-
-        if isinstance(other, (float, np.float)):
-            other = self.endec.encode(other)
-        z_value = _table_scalar_op(self.value, other, operator.sub)
+        z_value = self.value.join(other, op)
         return self._boxed(z_value)
 
     def _boxed(self, value, tensor_name=None):

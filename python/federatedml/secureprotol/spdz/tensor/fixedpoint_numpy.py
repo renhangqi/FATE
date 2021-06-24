@@ -20,6 +20,7 @@ from fate_arch.session import is_table
 from federatedml.secureprotol.spdz.beaver_triples import beaver_triplets
 from federatedml.secureprotol.spdz.tensor.base import TensorBase
 from federatedml.secureprotol.spdz.utils.random_utils import urand_tensor
+from federatedml.secureprotol.fixedpoint import FixedPointNumber
 
 
 class FixedPointEndec(object):
@@ -31,7 +32,7 @@ class FixedPointEndec(object):
 
     def decode(self, integer_tensor: np.ndarray):
         value = integer_tensor % self.field
-        gate = value > self.field / 2
+        gate = value > self.field // 2
         neg_nums = (value - self.field) * gate
         pos_nums = value * (1 - gate)
         result = (neg_nums + pos_nums) / (self.base ** self.precision_fractional)
@@ -153,9 +154,11 @@ class FixedPointTensor(TensorBase):
         if isinstance(source, np.ndarray):
             source = encoder.encode(source)
             _pre = urand_tensor(q_field, source)
+            # assert 1 == 2, f"q_field: {q_field}, _pre: {_pre.max()}"
             spdz.communicator.remote_share(share=_pre, tensor_name=tensor_name, party=spdz.other_parties[0])
             for _party in spdz.other_parties[1:]:
                 r = urand_tensor(q_field, source)
+                r = encoder.encode(r)
                 spdz.communicator.remote_share(share=r - _pre, tensor_name=tensor_name, party=_party)
                 _pre = r
             share = source - _pre
@@ -164,6 +167,20 @@ class FixedPointTensor(TensorBase):
         else:
             raise ValueError(f"type={type(source)}")
         return FixedPointTensor(share, spdz.q_field, encoder, tensor_name)
+
+    @classmethod
+    def from_value(cls, value, **kwargs):
+        spdz = cls.get_spdz()
+        q_field = kwargs['q_field'] if 'q_field' in kwargs else spdz.q_field
+        if 'encoder' in kwargs:
+            encoder = kwargs['encoder']
+        else:
+            base = kwargs['base'] if 'base' in kwargs else 10
+            frac = kwargs['frac'] if 'frac' in kwargs else 4
+            encoder = FixedPointEndec(q_field, base, frac)
+        tensor_name = kwargs.get("tensor_name")
+        # return FixedPointTensor(value, q_field, encoder, tensor_name)
+        return cls(value, q_field, encoder, tensor_name)
 
     def einsum(self, other: 'FixedPointTensor', einsum_expr, target_name=None):
         spdz = self.get_spdz()
@@ -220,8 +237,14 @@ class FixedPointTensor(TensorBase):
             raise ValueError("name not specified")
 
         # get shares from other parties
+        from federatedml.util import LOGGER
+        LOGGER.debug(f"share_val: {share_val}")
         for other_share in spdz.communicator.get_rescontruct_shares(name):
-            share_val += other_share
+            # share_val = self.endec.decode(share_val)
+            # other_share = self.endec.decode(other_share)
+            share_val = share_val + other_share
+            LOGGER.debug(f"share_val: {share_val}, other_share: {other_share}")
+
             # share_val %= self.q_field
         share_val = self.endec.decode(share_val)
         return share_val

@@ -45,8 +45,8 @@ def main(config="../../config.yaml", namespace=""):
     guest = parties.guest[0]
     hosts = parties.host[0]
 
-    guest_train_data = {"name": "default_credit_hetero_guest", "namespace": f"experiment{namespace}"}
-    host_train_data = {"name": "default_credit_hetero_host", "namespace": f"experiment{namespace}"}
+    guest_train_data = {"name": "breast_hetero_guest", "namespace": f"experiment{namespace}"}
+    host_train_data = {"name": "breast_hetero_host", "namespace": f"experiment{namespace}"}
 
     # initialize pipeline
     pipeline = PipeLine()
@@ -86,13 +86,16 @@ def main(config="../../config.yaml", namespace=""):
         "optimizer": "rmsprop",
         "tol": 0.0001,
         "alpha": 0.01,
-        "max_iter": 10,
+        "max_iter": 1,
         "early_stop": "diff",
         "batch_size": -1,
         "learning_rate": 0.15,
         "init_param": {
             "init_method": "zeros",
             "fit_intercept": False
+        },
+        "encrypt_param": {
+            "key_length": 1024
         }
     }
 

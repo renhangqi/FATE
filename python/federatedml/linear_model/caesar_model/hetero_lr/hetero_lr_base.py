@@ -21,16 +21,15 @@ import operator
 import numpy as np
 
 from federatedml.linear_model.caesar_model.caesar_base import CaesarBase
+from federatedml.linear_model.linear_model_weight import LinearModelWeights
 from federatedml.param.caesar_param import LogisticRegressionParam
+from federatedml.protobuf.generated import lr_model_meta_pb2, lr_model_param_pb2
 from federatedml.secureprotol import PaillierEncrypt
 from federatedml.secureprotol.spdz import SPDZ
 from federatedml.secureprotol.spdz.tensor import fixedpoint_numpy, fixedpoint_table
 from federatedml.transfer_variable.transfer_class.caesar_model_transfer_variable import CaesarModelTransferVariable
 from federatedml.util import LOGGER
 from federatedml.util import consts
-from federatedml.util import fate_operator
-from federatedml.linear_model.linear_model_weight import LinearModelWeights
-from federatedml.protobuf.generated import lr_model_meta_pb2, lr_model_param_pb2
 
 
 class HeteroLRBase(CaesarBase):
@@ -47,7 +46,6 @@ class HeteroLRBase(CaesarBase):
         self.model_param = LogisticRegressionParam()
         self.features = None
         self.labels = None
-        self.fix_point_encoder = None
 
     def _init_model(self, params: LogisticRegressionParam):
         super()._init_model(params)
@@ -67,14 +65,22 @@ class HeteroLRBase(CaesarBase):
         source = [w, self.other_party]
         if self.local_party.role == consts.GUEST:
             wb, wa = (
-                fixedpoint_numpy.FixedPointTensor.from_source(f"wb_{n_iter}", source[0], encoder=fix_point_encoder),
-                fixedpoint_numpy.FixedPointTensor.from_source(f"wa_{n_iter}", source[1], encoder=fix_point_encoder),
+                fixedpoint_numpy.FixedPointTensor.from_source(f"wb_{n_iter}", source[0],
+                                                              encoder=fix_point_encoder,
+                                                              q_field=self.random_field),
+                fixedpoint_numpy.FixedPointTensor.from_source(f"wa_{n_iter}", source[1],
+                                                              encoder=fix_point_encoder,
+                                                              q_field=self.random_field),
             )
             return wb, wa
         else:
             wa, wb = (
-                fixedpoint_numpy.FixedPointTensor.from_source(f"wa_{n_iter}", source[0], encoder=fix_point_encoder),
-                fixedpoint_numpy.FixedPointTensor.from_source(f"wb_{n_iter}", source[1], encoder=fix_point_encoder),
+                fixedpoint_numpy.FixedPointTensor.from_source(f"wa_{n_iter}", source[0],
+                                                              encoder=fix_point_encoder,
+                                                              q_field=self.random_field),
+                fixedpoint_numpy.FixedPointTensor.from_source(f"wb_{n_iter}", source[1],
+                                                              encoder=fix_point_encoder,
+                                                              q_field=self.random_field),
             )
             return wa, wb
 
@@ -82,6 +88,9 @@ class HeteroLRBase(CaesarBase):
         raise NotImplementedError("Should not call here")
 
     def compute_gradient(self, wa, wb, error, suffix):
+        raise NotImplementedError("Should not call here")
+
+    def transfer_pubkey(self):
         raise NotImplementedError("Should not call here")
 
     def fit(self, data_instances, validate_data=None):
@@ -99,18 +108,26 @@ class HeteroLRBase(CaesarBase):
         if self.role == consts.GUEST:
             self.labels = data_instances.mapValues(lambda x: np.array([x.label], dtype=int))
         source_features = data_instances.mapValues(lambda x: x.features)
+        LOGGER.debug(f"source_features: {source_features.first()}")
+
+        remote_pubkey = self.transfer_pubkey()
+        LOGGER.debug(f"n: {remote_pubkey.n}")
         with SPDZ(
                 "pearson",
                 local_party=self.local_party,
                 all_parties=self.parties,
                 use_mix_rand=self.model_param.use_mix_rand,
         ) as spdz:
-            self.fix_point_encoder = self.create_fixpoint_encoder(spdz)
+            self.fix_point_encoder = self.create_fixpoint_encoder(remote_pubkey.n)
+            LOGGER.debug(f"fix_point_encoder: {self.fix_point_encoder.__dict__}")
             w_self, w_remote = self.share_init_model(w, self.fix_point_encoder)
-            LOGGER.debug(f"w_self: {w_self.value}, w_remote shape: {w_remote.value}")
+            # LOGGER.debug(f"w_self: {w_self.value[0].encoding}")
+            # LOGGER.debug(f"w_self: {w_self.value}, w_remote shape: {w_remote.value[0].encoding}")
+
             self.features = fixedpoint_table.FixedPointTensor(self.fix_point_encoder.encode(source_features),
-                                                              q_field=spdz.q_field,
+                                                              q_field=self.fix_point_encoder.n,
                                                               endec=self.fix_point_encoder)
+            LOGGER.debug(f"encoded features: {self.features.value.first()}")
             while self.n_iter_ < self.max_iter:
                 LOGGER.debug(f"n_iter: {self.n_iter_}")
                 current_suffix = (self.n_iter_,)
@@ -118,9 +135,9 @@ class HeteroLRBase(CaesarBase):
                 if self.role == consts.GUEST:
                     error = y.value.join(self.labels, operator.sub)
                     LOGGER.debug(f"error: {error.first()}")
-                    error = self.features.from_value(error,
-                                                     q_field=spdz.q_field,
-                                                     encoder=self.fix_point_encoder)
+                    error = fixedpoint_table.FixedPointTensor.from_value(error,
+                                                                         q_field=self.fix_point_encoder.n,
+                                                                         encoder=self.fix_point_encoder)
                     w_remote, w_self = self.compute_gradient(wa=w_remote, wb=w_self, error=error, suffix=current_suffix)
                     LOGGER.debug(f"before_reconstruct, w_self: {w_self.value}, w_remote shape: {w_remote.value}")
 
@@ -134,6 +151,9 @@ class HeteroLRBase(CaesarBase):
                     w_remote.broadcast_reconstruct_share(tensor_name=f"wb_{self.n_iter_}")
                     new_w = w_self.reconstruct_unilateral(tensor_name=f"wa_{self.n_iter_}")
                 LOGGER.debug(f"new_w: {new_w}")
+                self.model_weights = LinearModelWeights(l=new_w,
+                                                        fit_intercept=self.model_param.init_param.fit_intercept)
+
                 w_self, w_remote = self.share_init_model(
                     new_w, fix_point_encoder=self.fix_point_encoder, n_iter=self.n_iter_)
                 # weight_diff = fate_operator.norm(last_weight - new_w)
@@ -148,6 +168,7 @@ class HeteroLRBase(CaesarBase):
             for var_name in ["z", "z_square", "z_cube"]:
                 z = kwargs[var_name]
                 encrypt_z = self.cipher.distribute_encrypt(z.value)
+                LOGGER.debug(f"encoded_n: {encrypt_z.first()[1][0].public_key.n}")
                 self.transfer_variable.encrypted_share_matrix.remote(encrypt_z, role=consts.GUEST,
                                                                      suffix=(var_name,) + suffix)
         else:

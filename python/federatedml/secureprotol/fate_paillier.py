@@ -20,6 +20,7 @@ from collections.abc import Mapping
 from federatedml.secureprotol.fixedpoint import FixedPointNumber
 from federatedml.secureprotol import gmpy_math
 import random
+from federatedml.util import LOGGER
 
 
 class PaillierKeypair(object):
@@ -96,6 +97,13 @@ class PaillierPublicKey(object):
     def encrypt(self, value, precision=None, random_value=None):
         """Encode and Paillier encrypt a real number value.
         """
+        # if not isinstance(value, FixedPointNumber):
+        #     encoding = FixedPointNumber.encode(value, self.n, self.max_int, precision)
+        # else:
+        #     encoding = value
+        if isinstance(value, FixedPointNumber):
+            value = value.decode()
+            LOGGER.debug(f"Before encrypt, value: {value}")
         encoding = FixedPointNumber.encode(value, self.n, self.max_int, precision)
         obfuscator = random_value or 1
         ciphertext = self.raw_encrypt(encoding.encoding, random_value=obfuscator)
@@ -235,6 +243,7 @@ class PaillierEncryptedNumber(object):
         return self.__add__(other)
 
     def __sub__(self, other):
+        LOGGER.debug(f"Get into sub, other: {other}")
         return self + (other * -1)
 
     def __rsub__(self, other):
@@ -249,8 +258,11 @@ class PaillierEncryptedNumber(object):
     def __mul__(self, scalar):
         """return Multiply by an scalar(such as int, float)
         """
-
-        encode = FixedPointNumber.encode(scalar, self.public_key.n, self.public_key.max_int)
+        if isinstance(scalar, FixedPointNumber):
+            scalar = scalar.decode()
+        LOGGER.debug(f"in_mul, scalar: {scalar}, {type(scalar)}")
+        encode = FixedPointNumber.encode(scalar, self.public_key.n, self.public_key.max_int,
+                                         max_exponent=self.exponent)
         plaintext = encode.encoding
 
         if plaintext < 0 or plaintext >= self.public_key.n:
@@ -294,11 +306,13 @@ class PaillierEncryptedNumber(object):
     def __add_scalar(self, scalar):
         """return PaillierEncryptedNumber: z = E(x) + y
         """
+        if isinstance(scalar, FixedPointNumber):
+            scalar = scalar.decode()
+        LOGGER.debug(f"in_add, scalar: {scalar}, {type(scalar)}")
         encoded = FixedPointNumber.encode(scalar,
                                           self.public_key.n,
                                           self.public_key.max_int,
                                           max_exponent=self.exponent)
-
         return self.__add_fixpointnumber(encoded)
 
     def __add_fixpointnumber(self, encoded):
