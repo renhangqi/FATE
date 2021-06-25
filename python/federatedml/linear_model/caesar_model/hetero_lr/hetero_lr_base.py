@@ -119,6 +119,7 @@ class HeteroLRBase(CaesarBase):
                 use_mix_rand=self.model_param.use_mix_rand,
         ) as spdz:
             self.fix_point_encoder = self.create_fixpoint_encoder(remote_pubkey.n)
+            self.encrypted_source_features = self.cipher.distribute_encrypt(source_features)
             w_self, w_remote = self.share_init_model(w, self.fix_point_encoder)
 
 
@@ -133,8 +134,6 @@ class HeteroLRBase(CaesarBase):
                 LOGGER.debug(f"n_iter: {self.n_iter_}")
                 current_suffix = (self.n_iter_,)
                 y = self.cal_prediction(w_self, w_remote, features=self.features, spdz=spdz, suffix=current_suffix)
-
-
 
                 if self.role == consts.GUEST:
                     error = y.value.join(self.labels, operator.sub)
@@ -172,7 +171,6 @@ class HeteroLRBase(CaesarBase):
             for var_name in ["z", "z_square", "z_cube"]:
                 z = kwargs[var_name]
                 encrypt_z = self.cipher.distribute_encrypt(z.value)
-                LOGGER.debug(f"encoded_n: {encrypt_z.first()[1][0].public_key.n}")
                 self.transfer_variable.encrypted_share_matrix.remote(encrypt_z, role=consts.GUEST,
                                                                      suffix=(var_name,) + suffix)
         else:

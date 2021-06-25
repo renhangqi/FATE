@@ -109,29 +109,15 @@ class FixedPointTensor(TensorBase):
     def dot_local(self, other: 'FixedPointTensor', target_name=None):
         if target_name is None:
             target_name = NamingService.get_instance().next()
-        # if self.is_encrypted_number(other.value):
-        #     res = table_dot(self.value, other.value)
-        #     return fixedpoint_numpy.PaillierFixedPointTensor(res, self.q_field, self.endec, target_name)
-        # else:
         res = table_dot_mod(self.value, other.value, self.q_field)
         return fixedpoint_numpy.FixedPointTensor(res, self.q_field, self.endec, target_name)
 
     def dot_array(self, array):
-        # party_idx = self.get_spdz().party_idx
-
         def _dot(x):
-            LOGGER.debug(f"in_dot, x:{x}, array: {array}")
             res = fate_operator.vec_dot(x, array)
 
-            # res = 0
-            # for idx, xi in enumerate(x):
-            #     LOGGER.debug(f"idx: {idx},"
-            #                  f"xi: {xi.encoding}, {xi.exponent}, {xi.n}, {xi.max_int} "
-            #                  f"array: {array[idx].encoding}, {array[idx].exponent}")
-            #     res = res + xi * array[idx]
             if not isinstance(res, np.ndarray):
                 res = np.array([res])
-            LOGGER.debug(f"dot_result: {self.endec.decode(res)}")
             return res
 
         return self._boxed(self.value.mapValues(_dot))
@@ -230,10 +216,7 @@ class FixedPointTensor(TensorBase):
         return False
 
     def _basic_op(self, other, op):
-        # if isinstance(other, (float, np.float)):
-        #     other = self.endec.encode(other)
-        #     z_value = _table_scalar_op(self.value, other, op)
-        #     return self._boxed(z_value)
+
         if isinstance(other, (int, np.int, float, np.float, FixedPointNumber)):
             z_value = _table_scalar_op(self.value, other, op)
             return self._boxed(z_value)
@@ -244,12 +227,8 @@ class FixedPointTensor(TensorBase):
         if self.is_encrypted_number(other):
             z_value = self.value.join(other, op)
         else:
-            LOGGER.debug(f"before op, other: {other.first()}, self: {self.value.first()}")
             z_value = _table_binary_op(self.value, other, self.q_field, op)
-            LOGGER.debug(f"z_value: {z_value.first()}, self.value: {self.value.first()}, other:"
-                         f" {other.first()}, op: {op}")
-            if other.first()[1][0] > 1e10:
-                assert 1 == 2
+
         return self._boxed(z_value)
 
     def __add__(self, other):
@@ -260,24 +239,6 @@ class FixedPointTensor(TensorBase):
 
     def __mul__(self, other):
         return self._basic_op(other, operator.mul)
-        # if isinstance(other, (int, np.integer)):
-        #     if not self.is_encrypted_number(self.value):
-        #         # return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other) % self.q_field))
-        #         return self._boxed(_table_scalar_mod_op(self.value, other, self.q_field, operator.mul))
-        #         # return self._boxed(self.value.mapValues(lambda x: operator.mul(x, other)))
-        #     else:
-        #         return self._boxed(_table_scalar_op(self.value, other, operator.mul))
-        # elif isinstance(other, FixedPointTensor):
-        #     if self.is_encrypted_number(other.value):
-        #         return self._boxed(self.value.join(other.value, operator.mul))
-        #     else:
-        #         return self._boxed(_table_binary_op(self.value, other.value, self.q_field, operator.mul))
-        # elif isinstance(other, (float, np.float)):
-        #     other = self.endec.encode(other)
-        #     LOGGER.debug(f'encoded other: {other}, {type(other)}')
-        #     return self._boxed(_table_scalar_mod_op(self.value, other, self.q_field, operator.mul))
-        # else:
-        #     raise NotImplementedError(f"table tensor __mul__ do not support type: {type(other)}")
 
     def __mod__(self, other):
         if not isinstance(other, (int, np.integer)):
@@ -292,15 +253,9 @@ class PaillierFixedPointTensor(FixedPointTensor):
 
     def dot_array(self, array):
         def _dot(x):
-            LOGGER.debug(f"In PaillierFixedPointTensor, x: {x}, array: {array}")
-            # res = fate_operator.vec_dot(x, array)
-            res = 0
-            for i, xi in enumerate(x):
-                LOGGER.debug(f"xi: {xi}, array: {array[i]}")
-                res = res + xi * array[i]
+            res = fate_operator.vec_dot(x, array)
             if not isinstance(res, np.ndarray):
                 res = np.array([res])
-            LOGGER.debug(f"dot_array_res: {res}")
             return res
 
         return self._boxed(self.value.mapValues(_dot))

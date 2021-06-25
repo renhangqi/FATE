@@ -43,26 +43,21 @@ class HeteroLRGuest(HeteroLRBase):
         #              f"w_self: {w_self.value[0].n}, z1: {z1.value.first()[1][0].n}")
         # LOGGER.debug(f"before mul, w_remote: {w_remote.value[0].encoding}, {w_remote.value[0].exponent}")
         za_share = self.secure_matrix_mul(w_remote, suffix=("za",) + suffix)
-        zb_share = self.secure_matrix_mul(features, cipher=self.cipher, suffix=("zb",) + suffix)
+        zb_share = self.secure_matrix_mul(self.encrypted_source_features,
+                                          cipher=self.cipher, suffix=("zb",) + suffix)
         z = z1 + za_share + zb_share
 
         z_square = z * z
         z_cube = z_square * z
-        LOGGER.debug(f"cal_prediction z: {z.value.first()}, z_square: {z_square.value.first()},"
-                     f"z_cube: {z_cube.value.first()}")
+
         remote_z, remote_z_square, remote_z_cube = self.share_z(suffix=suffix)
-        LOGGER.debug(f"remote_z_type: {type(remote_z)}")
-        LOGGER.debug(f"z_ns: {z.value.first()}, n: {z.value.first()[1][0].n},"
-                     f" remote_z: {remote_z.value.first()[1][0].public_key.n}")
 
         complete_z = remote_z + z
-        # complete_z_cube = remote_z_cube + remote_z_square * z * 3 + remote_z * z_square * 3 + z_cube
-        # LOGGER.debug(f"complete_z_cube count: {complete_z_cube.value.count()}")
-        # sigmoid_z = complete_z * 0.197 - complete_z_cube * 0.004 + 0.5
-        sigmoid_z = complete_z * 0.2 + 0.5
+        complete_z_cube = remote_z_cube + remote_z_square * z * 3 + remote_z * z_square * 3 + z_cube
+        sigmoid_z = complete_z * 0.197 - complete_z_cube * 0.004 + 0.5
+        # sigmoid_z = complete_z * 0.2 + 0.5
 
         shared_sigmoid_z = self.share_matrix(sigmoid_z, suffix=("sigmoid_z",) + suffix)
-        LOGGER.debug(f"shared_sigmoid_z: {list(shared_sigmoid_z.value.collect())}")
         return shared_sigmoid_z
 
     def compute_gradient(self, wa, wb, error, suffix):
@@ -80,29 +75,19 @@ class HeteroLRGuest(HeteroLRBase):
         encrypt_g = encrypt_error.value.join(self.features.value, operator.mul).reduce(operator.add) * encoded_1_n
         encrypt_g = fixedpoint_numpy.PaillierFixedPointTensor(encrypt_g, q_field=error.q_field,
                                                               endec=self.fix_point_encoder)
-        # encrypt_g = encrypt_error.dot_local(self.features) * encoded_1_n
         gb2 = self.share_matrix(encrypt_g, suffix=("encrypt_g",) + suffix)
-        # gb2.value = self.fix_point_encoder.encode(gb2.value)
 
         ga2_2 = self.secure_matrix_mul(error * encoded_1_n, suffix=("ga2",) + suffix)
-        # ga2_2.value = self.fix_point_encoder.encode(ga2_2.value)
 
-        # learning_rate = self.fix_point_encoder.encode(self.model_param.learning_rate)
         learning_rate = self.model_param.learning_rate
 
-        LOGGER.debug(f"before sub, start_wa shape: {wa.value}, wb shape: {wb.value}, learning_rate: {learning_rate},"
-                     f"gb2: {gb2.value}, ga2_2: {ga2_2}")
-        # wb.value = self.fix_point_encoder.truncate(wb.value)
         gb2 = gb2 * learning_rate
-        # gb2.value = self.fix_point_encoder.truncate(gb2.value)
 
         wb = wb - gb2
-        # wb.value = self.fix_point_encoder.truncate(wb.value)
 
         wa = wa - ga2_2.transpose() * learning_rate
         wa = wa.reshape(wa.shape[-1])
-        LOGGER.debug(f"wa shape: {wa.value}, wb shape: {wb.value}, gb2.shape: {gb2.value},"
-                     f"ga2_2.shape: {ga2_2.value}")
+
         return wa, wb
 
     @assert_io_num_rows_equal

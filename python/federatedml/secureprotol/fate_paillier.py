@@ -16,10 +16,10 @@
 #  limitations under the License.
 #
 
-from collections.abc import Mapping
-from federatedml.secureprotol.fixedpoint import FixedPointNumber
-from federatedml.secureprotol import gmpy_math
 import random
+
+from federatedml.secureprotol import gmpy_math
+from federatedml.secureprotol.fixedpoint import FixedPointNumber
 from federatedml.util import LOGGER
 
 
@@ -51,6 +51,7 @@ class PaillierKeypair(object):
 class PaillierPublicKey(object):
     """Contains a public key and associated encryption methods.
     """
+
     def __init__(self, n):
         self.g = n + 1
         self.n = n
@@ -97,13 +98,8 @@ class PaillierPublicKey(object):
     def encrypt(self, value, precision=None, random_value=None):
         """Encode and Paillier encrypt a real number value.
         """
-        # if not isinstance(value, FixedPointNumber):
-        #     encoding = FixedPointNumber.encode(value, self.n, self.max_int, precision)
-        # else:
-        #     encoding = value
         if isinstance(value, FixedPointNumber):
             value = value.decode()
-            LOGGER.debug(f"Before encrypt, value: {value}")
         encoding = FixedPointNumber.encode(value, self.n, self.max_int, precision)
         obfuscator = random_value or 1
         ciphertext = self.raw_encrypt(encoding.encoding, random_value=obfuscator)
@@ -117,6 +113,7 @@ class PaillierPublicKey(object):
 class PaillierPrivateKey(object):
     """Contains a private key and associated decryption method.
     """
+
     def __init__(self, public_key, p, q):
         if not p * q == public_key.n:
             raise ValueError("given public key does not match the given p and q")
@@ -150,7 +147,7 @@ class PaillierPrivateKey(object):
         """Computes the h-function as defined in Paillier's paper page.
         """
         return gmpy_math.invert(self.l_func(gmpy_math.powmod(self.public_key.g,
-                                                                 x - 1, xsquare), x), x)
+                                                             x - 1, xsquare), x), x)
 
     def l_func(self, x, p):
         """computes the L function as defined in Paillier's paper.
@@ -172,15 +169,15 @@ class PaillierPrivateKey(object):
         """
         if not isinstance(ciphertext, int):
             raise TypeError("ciphertext should be an int, not: %s" %
-                type(ciphertext))
+                            type(ciphertext))
 
         mp = self.l_func(gmpy_math.powmod(ciphertext,
-                                              self.p-1, self.psquare),
-                                              self.p) * self.hp % self.p
+                                          self.p - 1, self.psquare),
+                         self.p) * self.hp % self.p
 
         mq = self.l_func(gmpy_math.powmod(ciphertext,
-                                              self.q-1, self.qsquare),
-                                              self.q) * self.hq % self.q
+                                          self.q - 1, self.qsquare),
+                         self.q) * self.hq % self.q
 
         return self.crt(mp, mq)
 
@@ -195,14 +192,11 @@ class PaillierPrivateKey(object):
             raise ValueError("encrypted_number was encrypted against a different key!")
 
         encoded = self.raw_decrypt(encrypted_number.ciphertext(be_secure=False))
-        LOGGER.debug(f"Before re-encode: {encoded}")
         encoded = FixedPointNumber(encoded,
-                             encrypted_number.exponent,
-                             self.public_key.n,
-                             self.public_key.max_int)
+                                   encrypted_number.exponent,
+                                   self.public_key.n,
+                                   self.public_key.max_int)
         decrypt_value = encoded.decode()
-        LOGGER.debug(f"After re-encode: {decrypt_value}")
-
 
         return decrypt_value
 
@@ -210,6 +204,7 @@ class PaillierPrivateKey(object):
 class PaillierEncryptedNumber(object):
     """Represents the Paillier encryption of a float or int.
     """
+
     def __init__(self, public_key, ciphertext, exponent=0):
         self.public_key = public_key
         self.__ciphertext = ciphertext
@@ -246,7 +241,6 @@ class PaillierEncryptedNumber(object):
         return self.__add__(other)
 
     def __sub__(self, other):
-        LOGGER.debug(f"Get into sub, other: {other}")
         return self + (other * -1)
 
     def __rsub__(self, other):
@@ -263,7 +257,6 @@ class PaillierEncryptedNumber(object):
         """
         if isinstance(scalar, FixedPointNumber):
             scalar = scalar.decode()
-        LOGGER.debug(f"in_mul, scalar: {scalar}, {type(scalar)}")
         encode = FixedPointNumber.encode(scalar, self.public_key.n, self.public_key.max_int)
         plaintext = encode.encoding
 
@@ -310,7 +303,6 @@ class PaillierEncryptedNumber(object):
         """
         if isinstance(scalar, FixedPointNumber):
             scalar = scalar.decode()
-        LOGGER.debug(f"in_add, scalar: {scalar}, {type(scalar)}")
         encoded = FixedPointNumber.encode(scalar,
                                           self.public_key.n,
                                           self.public_key.max_int,
@@ -350,4 +342,3 @@ class PaillierEncryptedNumber(object):
         ciphertext = gmpy_math.mpz(e_x) * gmpy_math.mpz(e_y) % self.public_key.nsquare
 
         return PaillierEncryptedNumber(self.public_key, int(ciphertext), exponent)
-

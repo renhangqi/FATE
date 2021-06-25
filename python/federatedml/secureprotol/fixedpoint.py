@@ -263,28 +263,10 @@ class FixedPointNumber(object):
 
     def __add_fixpointnumber(self, other):
         if self.n != other.n:
-            # raise ValueError(f"Adding number with different field")
             other = self.encode(other.decode(), n=self.n, max_int=self.max_int)
         x, y = self.__align_exponent(self, other)
         encoding = (x.encoding + y.encoding) % self.n
-        from federatedml.util import LOGGER
-        LOGGER.debug(f"in __add_fixpointnumber, encoding: {encoding}, n: {self.n}")
         added_num = FixedPointNumber(encoding, x.exponent, n=self.n, max_int=self.max_int)
-        # if added_num.exponent < 0:
-        #     raise ValueError(f"exponent: {added_num.exponent}")
-        # if added_num.encoding.bit_length() > 150 and \
-        #         (self.n - added_num.encoding).bit_length() > 150:
-        #     raise OverflowError(f"other: {other.encoding}, self.encoding: {self.encoding},"
-        #                         f"exponent: {other.exponent}, {self.exponent}"
-        #                         f"x.encoding: {x.encoding}, exponent: {x.exponent}"
-        #                         f"y.encoding: {y.encoding}, exponent: {y.exponent}"
-        #                         f"encoding: {encoding}, exponent: {added_num.exponent}"
-        #                         f"mul_fixedpoint: {added_num.encoding},"
-        #                         f"mul_fixedpoint exponent: {added_num.exponent},"
-        #                         f"n: {self.n},"
-        #                         f"added_num.encoding.bit_length(): {added_num.encoding.bit_length()},"
-        #                         f"(self.n - added_num.encoding).bit_length():"
-        #                         f"{(self.n - added_num.encoding).bit_length()}")
         return self.__truncate(added_num)
 
     def __add_scalar(self, scalar):
@@ -306,11 +288,6 @@ class FixedPointNumber(object):
         exponet = self.exponent + other.exponent
         mul_fixedpoint = FixedPointNumber(encoding, exponet, n=self.n, max_int=self.max_int)
         truncate_mul_fixedpoint = self.__truncate(mul_fixedpoint)
-        # if truncate_mul_fixedpoint.encoding.bit_length() > 150 and \
-        #         (self.n - truncate_mul_fixedpoint.encoding).bit_length() > 150:
-        #     raise ValueError()
-        # if exponet < 0:
-        #     raise ValueError(f"exponent: {exponet}")
         return truncate_mul_fixedpoint
 
     def __mul_scalar(self, scalar):
@@ -357,12 +334,10 @@ class FixedPointEndec(object):
             view = arr.view().reshape(-1)
             t = tensor.view().reshape(-1)
             for i in range(arr.size):
-                LOGGER.debug(f"t: {t}, ti: {t[i]}, op: {op}")
                 view[i] = op(t[i])
             return arr
 
         elif is_table(tensor):
-            LOGGER.debug(f"is_table, tensor: {tensor.first()}")
             f = functools.partial(cls.table_op, op=op)
             return tensor.mapValues(f)
         else:

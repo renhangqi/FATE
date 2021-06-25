@@ -232,20 +232,12 @@ class FixedPointTensor(TensorBase):
         spdz = SPDZ.get_instance()
         share_val = self.value
         name = tensor_name or self.tensor_name
-
         if name is None:
             raise ValueError("name not specified")
-
         # get shares from other parties
-        from federatedml.util import LOGGER
-        LOGGER.debug(f"share_val: {share_val}")
         for other_share in spdz.communicator.get_rescontruct_shares(name):
-            # share_val = self.endec.decode(share_val)
-            # other_share = self.endec.decode(other_share)
             share_val = share_val + other_share
-            LOGGER.debug(f"share_val: {share_val}, other_share: {other_share}")
 
-            # share_val %= self.q_field
         share_val = self.endec.decode(share_val)
         return share_val
 

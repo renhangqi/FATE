@@ -35,30 +35,15 @@ class HeteroLRHost(HeteroLRBase):
 
     def cal_prediction(self, w_self, w_remote, features, spdz, suffix):
         z1 = features.dot_array(w_self.value)
-        za_share = self.secure_matrix_mul(features, cipher=self.cipher, suffix=("za",) + suffix)
+        za_share = self.secure_matrix_mul(self.encrypted_source_features, cipher=self.cipher, suffix=("za",) + suffix)
         zb_share = self.secure_matrix_mul(w_remote, suffix=("zb",) + suffix)
-        LOGGER.debug(f"w_x: {z1.value.first()}, za_share: {za_share.value.first()},"
-                     f" zb_share: {zb_share.value.first()}")
 
         z = z1 + za_share + zb_share
 
-        # z = w_remote
-        # z = z.convert_to_array_tensor()
-        # if self.role == consts.GUEST:
-        #     new_w = z.reconstruct_unilateral(tensor_name=f"y_{self.n_iter_}")
-        #     assert 1 == 2, f"new_w: {new_w}"
-        #
-        # else:
-        #     z.broadcast_reconstruct_share(tensor_name=f"y_{self.n_iter_}")
-        #     new_w = z.reconstruct_unilateral(tensor_name=f"y_{self.n_iter_}")
-
-
         z_square = z * z
         z_cube = z_square * z
-        # LOGGER.debug(f"cal_prediction z: {z.value.first()}, z_square: {z_square.value.first()},"
-        #              f"z_cube: {z_cube.value.first()}")
-        # self.share_z(suffix=(self.n_iter_,), z=z, z_square=z_square, z_cube=z_cube)
-        self.share_z(suffix=(self.n_iter_,), z=z, z_square=z, z_cube=z)
+
+        self.share_z(suffix=(self.n_iter_,), z=z, z_square=z_square, z_cube=z_cube)
 
         shared_sigmoid_z = self.received_share_matrix(self.cipher,
                                                       q_field=z.q_field,
@@ -74,26 +59,18 @@ class HeteroLRHost(HeteroLRBase):
                                          encoder=error.endec, suffix=("encrypt_g",) + suffix)
         LOGGER.debug(f"gb1_value: {gb1.value}")
         encoded_1_n = self.fix_point_encoder.encode(1 / n)
-        # encoded_1_n = 1 / n
         ga = error.value.join(self.features.value, operator.mul).reduce(operator.add) * encoded_1_n
         ga = fixedpoint_numpy.FixedPointTensor(ga, q_field=error.q_field,
                                                endec=self.fix_point_encoder)
-        # ga = error.dot_local(self.features) * encoded_1_n
-        ga2_1 = self.secure_matrix_mul(self.features, cipher=self.cipher, suffix=("ga2",) + suffix)
+        ga2_1 = self.secure_matrix_mul(self.encrypted_source_features, cipher=self.cipher, suffix=("ga2",) + suffix)
         LOGGER.debug(f"ga: {ga.value}, ga2_1: {ga2_1.value}")
         learning_rate = self.fix_point_encoder.encode(self.model_param.learning_rate)
         # learning_rate = self.model_param.learning_rate
         ga_new = ga + ga2_1.reshape(ga2_1.shape[0])
-        # ga_new.value = self.fix_point_encoder.truncate(ga_new.value)
-        LOGGER.debug(f"ga_shape: {ga.shape}, ga2_1.shape: {ga2_1.shape}, ga_shape: {ga_new.shape}")
-        # decode_val = self.fix_point_encoder.decode(ga_new.transpose() * learning_rate)
-        # LOGGER.debug(f"decode_val: {decode_val}")
+
         wa = wa - ga_new.transpose() * learning_rate
         wb = wb - gb1 * learning_rate
         wa = wa.reshape(wa.shape[-1])
-        LOGGER.debug(f"wa shape: {wa.value}, wb shape: {wb.value}, gb1.shape: {gb1.value},"
-                     f"ga_new.shape: {ga_new.value}")
-        LOGGER.debug(f"wa shape: {wa.value.shape}, wb shape: {wb.value.shape}, ga_shape: {ga.shape}")
 
         return wa, wb
 

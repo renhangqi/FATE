@@ -32,6 +32,7 @@ class CaesarBase(BaseLinearModel, ABC):
         self.transfer_variable = CaesarModelTransferVariable()
         self.fix_point_encoder = None
         self.random_field = 2 << 20
+        self.encrypted_source_features = None
 
     def _set_parties(self):
         # since multi-host not supported yet, we assume parties are one from guest and one from host
@@ -74,7 +75,6 @@ class CaesarBase(BaseLinearModel, ABC):
                                                                          encoder=matrix_tensor.endec,
                                                                          q_field=self.fix_point_encoder.n)
             to_share = matrix_tensor.value.join(random_tensor.value, operator.sub)
-            LOGGER.debug(f"to_share: {to_share.first()}")
         elif isinstance(matrix_tensor, fixedpoint_numpy.FixedPointTensor):
             random_tensor = fixedpoint_numpy.FixedPointTensor.from_value(value=r,
                                                                          encoder=matrix_tensor.endec,
@@ -83,8 +83,6 @@ class CaesarBase(BaseLinearModel, ABC):
         else:
             raise ValueError(f"Share_matrix input error, type of input: {type(matrix_tensor)}")
         dest_role = consts.GUEST if self.role == consts.HOST else consts.HOST
-
-        # to_share = matrix_tensor.value
 
         self.transfer_variable.share_matrix.remote(to_share, role=dest_role, suffix=curt_suffix)
         return random_tensor
@@ -99,7 +97,6 @@ class CaesarBase(BaseLinearModel, ABC):
         if isinstance(share, np.ndarray):
             share = cipher.recursive_decrypt(share)
             share = encoder.encode(share)
-            LOGGER.debug(f"received_share: {share}")
             return fixedpoint_numpy.FixedPointTensor(value=share,
                                                      q_field=q_field,
                                                      endec=encoder)
@@ -107,15 +104,16 @@ class CaesarBase(BaseLinearModel, ABC):
         share = encoder.encode(share)
         return fixedpoint_table.FixedPointTensor.from_value(share, q_field=q_field, encoder=encoder)
 
-    def secure_matrix_mul(self, matrix: fixedpoint_table.FixedPointTensor, cipher=None, suffix=tuple()):
+    def secure_matrix_mul(self, matrix, cipher=None, suffix=tuple()):
         curt_suffix = ("secure_matrix_mul",) + suffix
         if cipher is not None:
             dest_role = consts.GUEST if self.role == consts.HOST else consts.HOST
-            LOGGER.debug(f"matrix.value: {matrix.value.first()}")
-            de_matrix = self.fix_point_encoder.decode(matrix.value)
-            encrypt_mat = cipher.distribute_encrypt(de_matrix)
-            self.transfer_variable.share_matrix.remote(encrypt_mat, role=dest_role, idx=0, suffix=curt_suffix)
-            return self.received_share_matrix(cipher, q_field=matrix.q_field, encoder=matrix.endec, suffix=suffix)
+            # LOGGER.debug(f"matrix.value: {matrix.value.first()}")
+            # de_matrix = self.fix_point_encoder.decode(matrix.value)
+            # encrypt_mat = cipher.distribute_encrypt(de_matrix)
+            self.transfer_variable.share_matrix.remote(matrix, role=dest_role, idx=0, suffix=curt_suffix)
+            return self.received_share_matrix(cipher, q_field=self.fix_point_encoder.n,
+                                              encoder=self.fix_point_encoder, suffix=suffix)
         else:
             share = self.transfer_variable.share_matrix.get_parties(parties=self.other_party,
                                                                     suffix=curt_suffix)[0]
