@@ -123,11 +123,6 @@ class FixedPointTensor(TensorBase):
             LOGGER.debug(f"in_dot, x:{x}, array: {array}")
             res = fate_operator.vec_dot(x, array)
 
-            if res > 1:
-                pass
-            else:
-                assert 1 == 2, f"Some debug log"
-
             # res = 0
             # for idx, xi in enumerate(x):
             #     LOGGER.debug(f"idx: {idx},"
@@ -140,6 +135,10 @@ class FixedPointTensor(TensorBase):
             return res
 
         return self._boxed(self.value.mapValues(_dot))
+
+    def convert_to_array_tensor(self):
+        array = np.array([x[1] for x in self.value.collect()])
+        return fixedpoint_numpy.FixedPointTensor(array, q_field=self.q_field, endec=self.endec)
 
     @classmethod
     def from_value(cls, value, **kwargs):
@@ -247,8 +246,10 @@ class FixedPointTensor(TensorBase):
         else:
             LOGGER.debug(f"before op, other: {other.first()}, self: {self.value.first()}")
             z_value = _table_binary_op(self.value, other, self.q_field, op)
-            LOGGER.debug(f"z_value: {z_value.count()}, self.value: {self.value.count()}, other:"
-                         f" {other.count()}")
+            LOGGER.debug(f"z_value: {z_value.first()}, self.value: {self.value.first()}, other:"
+                         f" {other.first()}, op: {op}")
+            if other.first()[1][0] > 1e10:
+                assert 1 == 2
         return self._boxed(z_value)
 
     def __add__(self, other):
@@ -295,10 +296,11 @@ class PaillierFixedPointTensor(FixedPointTensor):
             # res = fate_operator.vec_dot(x, array)
             res = 0
             for i, xi in enumerate(x):
-                # LOGGER.debug(f"xi: {xi}, array: {array[i].encoding}")
-                res += xi * array[i]
+                LOGGER.debug(f"xi: {xi}, array: {array[i]}")
+                res = res + xi * array[i]
             if not isinstance(res, np.ndarray):
                 res = np.array([res])
+            LOGGER.debug(f"dot_array_res: {res}")
             return res
 
         return self._boxed(self.value.mapValues(_dot))

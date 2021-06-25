@@ -195,11 +195,14 @@ class PaillierPrivateKey(object):
             raise ValueError("encrypted_number was encrypted against a different key!")
 
         encoded = self.raw_decrypt(encrypted_number.ciphertext(be_secure=False))
+        LOGGER.debug(f"Before re-encode: {encoded}")
         encoded = FixedPointNumber(encoded,
                              encrypted_number.exponent,
                              self.public_key.n,
                              self.public_key.max_int)
         decrypt_value = encoded.decode()
+        LOGGER.debug(f"After re-encode: {decrypt_value}")
+
 
         return decrypt_value
 
@@ -261,8 +264,7 @@ class PaillierEncryptedNumber(object):
         if isinstance(scalar, FixedPointNumber):
             scalar = scalar.decode()
         LOGGER.debug(f"in_mul, scalar: {scalar}, {type(scalar)}")
-        encode = FixedPointNumber.encode(scalar, self.public_key.n, self.public_key.max_int,
-                                         max_exponent=self.exponent)
+        encode = FixedPointNumber.encode(scalar, self.public_key.n, self.public_key.max_int)
         plaintext = encode.encoding
 
         if plaintext < 0 or plaintext >= self.public_key.n:

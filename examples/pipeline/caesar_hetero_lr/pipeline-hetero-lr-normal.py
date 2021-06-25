@@ -86,7 +86,7 @@ def main(config="../../config.yaml", namespace=""):
         "optimizer": "rmsprop",
         "tol": 0.0001,
         "alpha": 0.01,
-        "max_iter": 1,
+        "max_iter": 2,
         "early_stop": "diff",
         "batch_size": -1,
         "learning_rate": 0.15,

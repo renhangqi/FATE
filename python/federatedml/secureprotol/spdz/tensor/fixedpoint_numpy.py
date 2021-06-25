@@ -286,7 +286,8 @@ class FixedPointTensor(TensorBase):
     def __add__(self, other):
         if isinstance(other, FixedPointTensor):
             return self._raw_add(other.value)
-        z_value = (self.value + self.endec.encode(other / 2)) % self.q_field
+        # z_value = (self.value + self.endec.encode(other / 2)) % self.q_field
+        z_value = (self.value + self.endec.encode(other / 2))
         return self._boxed(z_value)
 
     def __radd__(self, other):

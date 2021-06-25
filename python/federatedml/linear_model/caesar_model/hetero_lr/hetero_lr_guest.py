@@ -39,18 +39,13 @@ class HeteroLRGuest(HeteroLRBase):
     def cal_prediction(self, w_self, w_remote, features, spdz, suffix):
         # n = features.value.count()
         z1 = features.dot_array(w_self.value)
-        LOGGER.debug(f"features: {features.value.first()}, n: {features.value.first()[1][0].n},"
-                     f"w_self: {w_self.value[0].n}, z1: {z1.value.first()[1][0].n}")
+        # LOGGER.debug(f"features: {features.value.first()}, n: {features.value.first()[1][0].n},"
+        #              f"w_self: {w_self.value[0].n}, z1: {z1.value.first()[1][0].n}")
         # LOGGER.debug(f"before mul, w_remote: {w_remote.value[0].encoding}, {w_remote.value[0].exponent}")
         za_share = self.secure_matrix_mul(w_remote, suffix=("za",) + suffix)
         zb_share = self.secure_matrix_mul(features, cipher=self.cipher, suffix=("zb",) + suffix)
-
         z = z1 + za_share + zb_share
-        LOGGER.debug(f"z1.value.first()")
-        LOGGER.debug(f"zzzz: {z1.value.first()[1][0].n},"
-                     f" {za_share.value.first()},"
-                     f" {zb_share.value.first()},"
-                     f" {z.value.first()[1][0].n}")
+
         z_square = z * z
         z_cube = z_square * z
         LOGGER.debug(f"cal_prediction z: {z.value.first()}, z_square: {z_square.value.first()},"

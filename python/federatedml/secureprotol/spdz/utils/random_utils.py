@@ -90,6 +90,7 @@ def _mix_rand_func(it, q_field):
 
 
 def urand_tensor(q_field, tensor, use_mix=False):
+    # q_field = 1
     if is_table(tensor):
         if use_mix:
             return tensor.mapPartitions(functools.partial(_mix_rand_func, q_field=q_field),

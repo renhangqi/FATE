@@ -41,6 +41,18 @@ class HeteroLRHost(HeteroLRBase):
                      f" zb_share: {zb_share.value.first()}")
 
         z = z1 + za_share + zb_share
+
+        # z = w_remote
+        # z = z.convert_to_array_tensor()
+        # if self.role == consts.GUEST:
+        #     new_w = z.reconstruct_unilateral(tensor_name=f"y_{self.n_iter_}")
+        #     assert 1 == 2, f"new_w: {new_w}"
+        #
+        # else:
+        #     z.broadcast_reconstruct_share(tensor_name=f"y_{self.n_iter_}")
+        #     new_w = z.reconstruct_unilateral(tensor_name=f"y_{self.n_iter_}")
+
+
         z_square = z * z
         z_cube = z_square * z
         # LOGGER.debug(f"cal_prediction z: {z.value.first()}, z_square: {z_square.value.first()},"

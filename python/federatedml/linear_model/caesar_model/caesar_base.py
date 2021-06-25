@@ -68,19 +68,24 @@ class CaesarBase(BaseLinearModel, ABC):
         r = fixedpoint_table.urand_tensor(q_field=self.random_field,
                                           tensor=table)
         r = self.fix_point_encoder.encode(r)
+        # LOGGER.debug(f"In_share_matrix, r: {r.first()}")
         if isinstance(matrix_tensor, fixedpoint_table.FixedPointTensor):
             random_tensor = fixedpoint_table.FixedPointTensor.from_value(value=r,
-                                                                         endec=matrix_tensor.endec,
+                                                                         encoder=matrix_tensor.endec,
                                                                          q_field=self.fix_point_encoder.n)
             to_share = matrix_tensor.value.join(random_tensor.value, operator.sub)
+            LOGGER.debug(f"to_share: {to_share.first()}")
         elif isinstance(matrix_tensor, fixedpoint_numpy.FixedPointTensor):
             random_tensor = fixedpoint_numpy.FixedPointTensor.from_value(value=r,
-                                                                         endec=matrix_tensor.endec,
+                                                                         encoder=matrix_tensor.endec,
                                                                          q_field=self.fix_point_encoder.n)
             to_share = (matrix_tensor - random_tensor).value
         else:
             raise ValueError(f"Share_matrix input error, type of input: {type(matrix_tensor)}")
         dest_role = consts.GUEST if self.role == consts.HOST else consts.HOST
+
+        # to_share = matrix_tensor.value
+
         self.transfer_variable.share_matrix.remote(to_share, role=dest_role, suffix=curt_suffix)
         return random_tensor
 
@@ -123,7 +128,7 @@ class CaesarBase(BaseLinearModel, ABC):
             else:
                 xy = share_tensor.dot_local(matrix)
             LOGGER.debug(f"Finish dot")
-            # xy_tensor = matrix.from_value(xy, q_field=matrix.q_field, encoder=matrix.endec)
-            # return self.share_matrix(xy, suffix=suffix)
+
+            # xy = share_tensor
             return self.share_matrix(xy, suffix=suffix)
 

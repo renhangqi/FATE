@@ -119,9 +119,10 @@ class HeteroLRBase(CaesarBase):
                 use_mix_rand=self.model_param.use_mix_rand,
         ) as spdz:
             self.fix_point_encoder = self.create_fixpoint_encoder(remote_pubkey.n)
-            LOGGER.debug(f"fix_point_encoder: {self.fix_point_encoder.__dict__}")
             w_self, w_remote = self.share_init_model(w, self.fix_point_encoder)
-            # LOGGER.debug(f"w_self: {w_self.value[0].encoding}")
+
+
+            LOGGER.debug(f"w_self: {w_self.value}, {w_remote.value}")
             # LOGGER.debug(f"w_self: {w_self.value}, w_remote shape: {w_remote.value[0].encoding}")
 
             self.features = fixedpoint_table.FixedPointTensor(self.fix_point_encoder.encode(source_features),
@@ -132,6 +133,9 @@ class HeteroLRBase(CaesarBase):
                 LOGGER.debug(f"n_iter: {self.n_iter_}")
                 current_suffix = (self.n_iter_,)
                 y = self.cal_prediction(w_self, w_remote, features=self.features, spdz=spdz, suffix=current_suffix)
+
+
+
                 if self.role == consts.GUEST:
                     error = y.value.join(self.labels, operator.sub)
                     LOGGER.debug(f"error: {error.first()}")
