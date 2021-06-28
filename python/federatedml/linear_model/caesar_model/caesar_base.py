@@ -111,20 +111,33 @@ class CaesarBase(BaseLinearModel, ABC):
             # LOGGER.debug(f"matrix.value: {matrix.value.first()}")
             # de_matrix = self.fix_point_encoder.decode(matrix.value)
             # encrypt_mat = cipher.distribute_encrypt(de_matrix)
-            self.transfer_variable.share_matrix.remote(matrix, role=dest_role, idx=0, suffix=curt_suffix)
+            if isinstance(matrix, fixedpoint_table.FixedPointTensor):
+                de_matrix = self.fix_point_encoder.decode(matrix.value)
+                encrypt_mat = cipher.distribute_encrypt(de_matrix)
+            else:
+                encrypt_mat = cipher.recursive_encrypt(matrix.value)
+            self.transfer_variable.share_matrix.remote(encrypt_mat, role=dest_role, idx=0, suffix=curt_suffix)
             return self.received_share_matrix(cipher, q_field=self.fix_point_encoder.n,
                                               encoder=self.fix_point_encoder, suffix=suffix)
         else:
             share = self.transfer_variable.share_matrix.get_parties(parties=self.other_party,
                                                                     suffix=curt_suffix)[0]
-            share_tensor = fixedpoint_table.PaillierFixedPointTensor.from_value(
-                share, q_field=matrix.q_field, encoder=matrix.endec)
+            # share_tensor = fixedpoint_table.PaillierFixedPointTensor.from_value(
+            #     share, q_field=matrix.q_field, encoder=matrix.endec)
 
             LOGGER.debug(f"Make share tensor")
-            if isinstance(matrix, fixedpoint_numpy.FixedPointTensor):
-                xy = share_tensor.dot_array(matrix.value)
+            # if isinstance(matrix, fixedpoint_numpy.FixedPointTensor):
+            #     xy = share_tensor.dot_array(matrix.value)
+            # else:
+            #     xy = share_tensor.dot_local(matrix)
+
+            # xy = matrix.dot_array(share)
+            if isinstance(share, np.ndarray):
+                xy = matrix.dot_array(share)
             else:
-                xy = share_tensor.dot_local(matrix)
+                share_tensor = fixedpoint_table.PaillierFixedPointTensor.from_value(
+                    share, q_field=matrix.q_field, encoder=matrix.endec)
+                xy = matrix.dot_local(share_tensor)
             LOGGER.debug(f"Finish dot")
 
             # xy = share_tensor

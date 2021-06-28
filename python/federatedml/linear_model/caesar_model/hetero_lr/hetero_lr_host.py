@@ -35,15 +35,23 @@ class HeteroLRHost(HeteroLRBase):
 
     def cal_prediction(self, w_self, w_remote, features, spdz, suffix):
         z1 = features.dot_array(w_self.value)
-        za_share = self.secure_matrix_mul(self.encrypted_source_features, cipher=self.cipher, suffix=("za",) + suffix)
-        zb_share = self.secure_matrix_mul(w_remote, suffix=("zb",) + suffix)
+        # za_share = self.secure_matrix_mul(self.features, cipher=self.cipher, suffix=("za",) + suffix)
+        # zb_share = self.secure_matrix_mul(w_remote, suffix=("zb",) + suffix)
+
+        za_share = self.secure_matrix_mul(self.features,  suffix=("za",) + suffix)
+        zb_share = self.secure_matrix_mul(w_remote, cipher=self.cipher, suffix=("zb",) + suffix)
 
         z = z1 + za_share + zb_share
 
-        z_square = z * z
-        z_cube = z_square * z
+        # z = z.convert_to_array_tensor()
+        # z.broadcast_reconstruct_share(tensor_name=f"z_{self.n_iter_}")
+        # import time
+        # time.sleep(5)
 
-        self.share_z(suffix=(self.n_iter_,), z=z, z_square=z_square, z_cube=z_cube)
+        # z_square = z * z
+        # z_cube = z_square * z
+
+        self.share_z(suffix=(self.n_iter_,), z=z, z_square=z, z_cube=z)
 
         shared_sigmoid_z = self.received_share_matrix(self.cipher,
                                                       q_field=z.q_field,
@@ -62,7 +70,7 @@ class HeteroLRHost(HeteroLRBase):
         ga = error.value.join(self.features.value, operator.mul).reduce(operator.add) * encoded_1_n
         ga = fixedpoint_numpy.FixedPointTensor(ga, q_field=error.q_field,
                                                endec=self.fix_point_encoder)
-        ga2_1 = self.secure_matrix_mul(self.encrypted_source_features, cipher=self.cipher, suffix=("ga2",) + suffix)
+        ga2_1 = self.secure_matrix_mul(self.features, suffix=("ga2",) + suffix)
         LOGGER.debug(f"ga: {ga.value}, ga2_1: {ga2_1.value}")
         learning_rate = self.fix_point_encoder.encode(self.model_param.learning_rate)
         # learning_rate = self.model_param.learning_rate

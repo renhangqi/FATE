@@ -119,17 +119,15 @@ class HeteroLRBase(CaesarBase):
                 use_mix_rand=self.model_param.use_mix_rand,
         ) as spdz:
             self.fix_point_encoder = self.create_fixpoint_encoder(remote_pubkey.n)
-            self.encrypted_source_features = self.cipher.distribute_encrypt(source_features)
+            # self.encrypted_source_features = self.cipher.distribute_encrypt(source_features)
             w_self, w_remote = self.share_init_model(w, self.fix_point_encoder)
 
 
             LOGGER.debug(f"w_self: {w_self.value}, {w_remote.value}")
-            # LOGGER.debug(f"w_self: {w_self.value}, w_remote shape: {w_remote.value[0].encoding}")
 
             self.features = fixedpoint_table.FixedPointTensor(self.fix_point_encoder.encode(source_features),
                                                               q_field=self.fix_point_encoder.n,
                                                               endec=self.fix_point_encoder)
-            LOGGER.debug(f"encoded features: {self.features.value.first()}")
             while self.n_iter_ < self.max_iter:
                 LOGGER.debug(f"n_iter: {self.n_iter_}")
                 current_suffix = (self.n_iter_,)
@@ -145,7 +143,6 @@ class HeteroLRBase(CaesarBase):
                     LOGGER.debug(f"before_reconstruct, w_self: {w_self.value}, w_remote shape: {w_remote.value}")
 
                     new_w = w_self.reconstruct_unilateral(tensor_name=f"wb_{self.n_iter_}")
-                    LOGGER.debug(f"new_w: {new_w}")
 
                     w_remote.broadcast_reconstruct_share(tensor_name=f"wa_{self.n_iter_}")
 
@@ -168,20 +165,24 @@ class HeteroLRBase(CaesarBase):
 
     def share_z(self, suffix, **kwargs):
         if self.role == consts.HOST:
-            for var_name in ["z", "z_square", "z_cube"]:
+            # for var_name in ["z", "z_square", "z_cube"]:
+            for var_name in ["z"]:
+
                 z = kwargs[var_name]
                 encrypt_z = self.cipher.distribute_encrypt(z.value)
                 self.transfer_variable.encrypted_share_matrix.remote(encrypt_z, role=consts.GUEST,
                                                                      suffix=(var_name,) + suffix)
         else:
             res = []
-            for var_name in ["z", "z_square", "z_cube"]:
+            # for var_name in ["z", "z_square", "z_cube"]:
+            for var_name in ["z"]:
                 z_table = self.transfer_variable.encrypted_share_matrix.get_parties(
                     self.other_party,
                     suffix=(var_name,) + suffix)[0]
                 res.append(fixedpoint_table.PaillierFixedPointTensor(
                     z_table, q_field=self.features.q_field, endec=self.features.endec))
-            return res[0], res[1], res[2]
+            # return res[0], res[1], res[2]
+            return res[0], res[0], res[0]
 
     def _get_param(self):
         param_protobuf_obj = lr_model_param_pb2.LRModelParam()

@@ -109,7 +109,7 @@ class FixedPointTensor(TensorBase):
     def dot_local(self, other: 'FixedPointTensor', target_name=None):
         if target_name is None:
             target_name = NamingService.get_instance().next()
-        res = table_dot_mod(self.value, other.value, self.q_field)
+        res = table_dot(self.value, other.value)
         return fixedpoint_numpy.FixedPointTensor(res, self.q_field, self.endec, target_name)
 
     def dot_array(self, array):

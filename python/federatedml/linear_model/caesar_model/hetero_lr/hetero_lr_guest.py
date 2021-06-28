@@ -39,23 +39,28 @@ class HeteroLRGuest(HeteroLRBase):
     def cal_prediction(self, w_self, w_remote, features, spdz, suffix):
         # n = features.value.count()
         z1 = features.dot_array(w_self.value)
-        # LOGGER.debug(f"features: {features.value.first()}, n: {features.value.first()[1][0].n},"
-        #              f"w_self: {w_self.value[0].n}, z1: {z1.value.first()[1][0].n}")
-        # LOGGER.debug(f"before mul, w_remote: {w_remote.value[0].encoding}, {w_remote.value[0].exponent}")
-        za_share = self.secure_matrix_mul(w_remote, suffix=("za",) + suffix)
-        zb_share = self.secure_matrix_mul(self.encrypted_source_features,
-                                          cipher=self.cipher, suffix=("zb",) + suffix)
+
+        # za_share = self.secure_matrix_mul(w_remote, suffix=("za",) + suffix)
+        # zb_share = self.secure_matrix_mul(self.features,
+        #                                   cipher=self.cipher, suffix=("zb",) + suffix)
+        za_share = self.secure_matrix_mul(w_remote, cipher=self.cipher, suffix=("za",) + suffix)
+        zb_share = self.secure_matrix_mul(self.features,
+                                          suffix=("zb",) + suffix)
         z = z1 + za_share + zb_share
 
-        z_square = z * z
-        z_cube = z_square * z
+        # z = z.convert_to_array_tensor()
+        # new_w = z.reconstruct_unilateral(tensor_name=f"z_{self.n_iter_}")
+        # raise ValueError(f"reconstructed z: {new_w}")
+
+        # z_square = z * z
+        # z_cube = z_square * z
 
         remote_z, remote_z_square, remote_z_cube = self.share_z(suffix=suffix)
 
         complete_z = remote_z + z
-        complete_z_cube = remote_z_cube + remote_z_square * z * 3 + remote_z * z_square * 3 + z_cube
-        sigmoid_z = complete_z * 0.197 - complete_z_cube * 0.004 + 0.5
-        # sigmoid_z = complete_z * 0.2 + 0.5
+        # complete_z_cube = remote_z_cube + remote_z_square * z * 3 + remote_z * z_square * 3 + z_cube
+        # sigmoid_z = complete_z * 0.197 - complete_z_cube * 0.004 + 0.5
+        sigmoid_z = complete_z * 0.2 + 0.5
 
         shared_sigmoid_z = self.share_matrix(sigmoid_z, suffix=("sigmoid_z",) + suffix)
         return shared_sigmoid_z
@@ -77,7 +82,8 @@ class HeteroLRGuest(HeteroLRBase):
                                                               endec=self.fix_point_encoder)
         gb2 = self.share_matrix(encrypt_g, suffix=("encrypt_g",) + suffix)
 
-        ga2_2 = self.secure_matrix_mul(error * encoded_1_n, suffix=("ga2",) + suffix)
+        ga2_2 = self.secure_matrix_mul(error * encoded_1_n, cipher=self.cipher,
+                                       suffix=("ga2",) + suffix)
 
         learning_rate = self.model_param.learning_rate
 

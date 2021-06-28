@@ -166,21 +166,13 @@ class FixedPointNumber(object):
         return self.__mul__(other)
 
     def __mul__(self, other):
-        try:
-            if isinstance(other, FixedPointNumber):
-                return self.__mul_fixpointnumber(other)
-            else:
-                return self.__mul_scalar(other)
-        except:
-            encoding = (self.encoding * other.encoding) % self.n
-            exponet = self.exponent + other.exponent
-            mul_fixedpoint = FixedPointNumber(encoding, exponet, n=self.n, max_int=self.max_int)
-            # truncate_mul_fixedpoint = self.__truncate(mul_fixedpoint)
-            raise OverflowError(f"other: {other.encoding}, self.encoding: {self.encoding},"
-                                f"encoding: {encoding}, exponent: {exponet}"
-                                f"mul_fixedpoint: {mul_fixedpoint.encoding},"
-                                f"mul_fixedpoint exponent: {mul_fixedpoint.exponent},"
-                                f"n: {self.n}")
+        from federatedml.secureprotol.fate_paillier import PaillierEncryptedNumber
+        if isinstance(other, FixedPointNumber):
+            return self.__mul_fixpointnumber(other)
+        elif isinstance(other, PaillierEncryptedNumber):
+            return other * self
+        else:
+            return self.__mul_scalar(other)
 
     def __truediv__(self, other):
         if isinstance(other, FixedPointNumber):
