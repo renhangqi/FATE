@@ -50,8 +50,6 @@ class BaseLinearModel(ModelBase):
         self.model_name = 'toSet'
         self.model_param_name = 'toSet'
         self.model_meta_name = 'toSet'
-        self.role = ''
-        self.mode = ''
         self.schema = {}
         self.cipher_operator = None
         self.model_weights = None

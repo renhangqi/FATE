@@ -53,11 +53,18 @@ def make_normal_dsl(config, namespace, lr_param, is_multi_host=False, has_valida
         guest_eval_data = {"name": "vehicle_scale_hetero_guest", "namespace": f"experiment{namespace}"}
         host_eval_data = {"name": "vehicle_scale_hetero_host", "namespace": f"experiment{namespace}"}
     else:
-        guest_train_data = {"name": "breast_hetero_guest", "namespace": f"experiment{namespace}"}
-        host_train_data = {"name": "breast_hetero_host", "namespace": f"experiment{namespace}"}
+        # guest_train_data = {"name": "breast_hetero_guest", "namespace": f"experiment{namespace}"}
+        # host_train_data = {"name": "breast_hetero_host", "namespace": f"experiment{namespace}"}
+        #
+        # guest_eval_data = {"name": "breast_hetero_guest", "namespace": f"experiment{namespace}"}
+        # host_eval_data = {"name": "breast_hetero_host", "namespace": f"experiment{namespace}"}
 
-        guest_eval_data = {"name": "breast_hetero_guest", "namespace": f"experiment{namespace}"}
-        host_eval_data = {"name": "breast_hetero_host", "namespace": f"experiment{namespace}"}
+        guest_train_data = {"name": "default_credit_hetero_guest", "namespace": f"experiment{namespace}"}
+        host_train_data = {"name": "default_credit_hetero_host", "namespace": f"experiment{namespace}"}
+
+        guest_eval_data = {"name": "default_credit_hetero_guest", "namespace": f"experiment{namespace}"}
+        host_eval_data = {"name": "default_credit_hetero_host", "namespace": f"experiment{namespace}"}
+
 
     train_line = []
     # initialize pipeline

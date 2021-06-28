@@ -20,8 +20,13 @@ import numpy as np
 from fate_arch import session
 from federatedml.linear_model.linear_model_base import BaseLinearModel
 from federatedml.secureprotol.fixedpoint import FixedPointEndec
+from federatedml.framework.hetero.procedure import paillier_cipher, batch_generator
 from federatedml.secureprotol.spdz.tensor import fixedpoint_numpy, fixedpoint_table
 from federatedml.transfer_variable.transfer_class.caesar_model_transfer_variable import CaesarModelTransferVariable
+from federatedml.transfer_variable.transfer_class.batch_generator_transfer_variable import \
+    BatchGeneratorTransferVariable
+from federatedml.transfer_variable.transfer_class.converge_checker_transfer_variable import \
+    ConvergeCheckerTransferVariable
 from federatedml.util import consts, LOGGER
 
 
@@ -33,6 +38,16 @@ class CaesarBase(BaseLinearModel, ABC):
         self.fix_point_encoder = None
         self.random_field = 2 << 20
         self.encrypted_source_features = None
+        self.converge_transfer_variable = ConvergeCheckerTransferVariable()
+
+    def _init_model(self, params):
+        super(CaesarBase, self)._init_model(params)
+        self.batch_generator = batch_generator.Guest() if self.role == consts.GUEST else batch_generator.Host()
+        LOGGER.debug(f"batch_generator: {self.batch_generator}, self.role: {self.role}")
+        self.batch_generator.register_batch_generator(BatchGeneratorTransferVariable(), has_arbiter=False)
+
+    def check_converge(self, last_w, new_w, suffix):
+        raise NotImplementedError("Should not call here")
 
     def _set_parties(self):
         # since multi-host not supported yet, we assume parties are one from guest and one from host
@@ -103,6 +118,31 @@ class CaesarBase(BaseLinearModel, ABC):
         share = cipher.distribute_decrypt(share)
         share = encoder.encode(share)
         return fixedpoint_table.FixedPointTensor.from_value(share, q_field=q_field, encoder=encoder)
+
+    def secure_matrix_mul_active(self, matrix, cipher, suffix=tuple()):
+        curt_suffix = ("secure_matrix_mul",) + suffix
+        dest_role = consts.GUEST if self.role == consts.HOST else consts.HOST
+        if isinstance(matrix, fixedpoint_table.FixedPointTensor):
+            de_matrix = self.fix_point_encoder.decode(matrix.value)
+            encrypt_mat = cipher.distribute_encrypt(de_matrix)
+        else:
+            encrypt_mat = cipher.recursive_encrypt(matrix.value)
+        self.transfer_variable.share_matrix.remote(encrypt_mat, role=dest_role, idx=0, suffix=curt_suffix)
+        # return self.received_share_matrix(cipher, q_field=self.fix_point_encoder.n,
+        #                                   encoder=self.fix_point_encoder, suffix=suffix)
+
+    def secure_matrix_mul_passive(self, matrix, suffix=tuple()):
+        curt_suffix = ("secure_matrix_mul",) + suffix
+        share = self.transfer_variable.share_matrix.get_parties(parties=self.other_party,
+                                                                suffix=curt_suffix)[0]
+        if isinstance(share, np.ndarray):
+            xy = matrix.dot_array(share)
+        else:
+            share_tensor = fixedpoint_table.PaillierFixedPointTensor.from_value(
+                share, q_field=matrix.q_field, encoder=matrix.endec)
+            xy = matrix.dot_local(share_tensor)
+        LOGGER.debug(f"Finish dot")
+        return self.share_matrix(xy, suffix=suffix)
 
     def secure_matrix_mul(self, matrix, cipher=None, suffix=tuple()):
         curt_suffix = ("secure_matrix_mul",) + suffix

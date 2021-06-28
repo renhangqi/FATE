@@ -1,6 +1,6 @@
 {
-  "federatedml.transfer_variable.transfer_class.rsa_intersect_transfer_variable.RsaIntersectTransferVariable": {
-    "guest_pubkey_ids": {
+  "federatedml.transfer_variable.transfer_class.secure_information_retrieval_transfer_variable.SecureInformationRetrievalTransferVariable": {
+    "commutative_cipher_public_knowledge": {
       "src": [
         "guest"
       ],
@@ -8,23 +8,7 @@
         "host"
       ]
     },
-    "host_pubkey_ids": {
-      "src": [
-        "host"
-      ],
-      "dst": [
-        "guest"
-      ]
-    },
-    "host_prvkey_ids": {
-      "src": [
-        "host"
-      ],
-      "dst": [
-        "guest"
-      ]
-    },
-    "guest_prvkey_ids": {
+    "id_ciphertext_list_exchange_g2h": {
       "src": [
         "guest"
       ],
@@ -32,7 +16,7 @@
         "host"
       ]
     },
-    "host_sign_guest_ids": {
+    "id_ciphertext_list_exchange_h2g": {
       "src": [
         "host"
       ],
@@ -40,23 +24,7 @@
         "guest"
       ]
     },
-    "guest_sign_host_ids": {
-      "src": [
-        "guest"
-      ],
-      "dst": [
-        "host"
-      ]
-    },
-    "intersect_ids": {
-      "src": [
-        "guest"
-      ],
-      "dst": [
-        "host"
-      ]
-    },
-    "host_intersect_ids": {
+    "data_count": {
       "src": [
         "host"
       ],
@@ -64,7 +32,7 @@
         "guest"
       ]
     },
-    "host_pubkey": {
+    "doubly_encrypted_id_list": {
       "src": [
         "host"
       ],
@@ -72,7 +40,7 @@
         "guest"
       ]
     },
-    "guest_pubkey": {
+    "natural_indexation": {
       "src": [
         "guest"
       ],
@@ -80,7 +48,7 @@
         "host"
       ]
     },
-    "cache_version_info": {
+    "block_num": {
       "src": [
         "guest"
       ],
@@ -88,7 +56,7 @@
         "host"
       ]
     },
-    "cache_version_match_info": {
+    "id_blocks_ciphertext": {
       "src": [
         "host"
       ],
@@ -96,7 +64,7 @@
         "guest"
       ]
     },
-    "intersect_guest_ids": {
+    "intersect_cipher_cipher": {
       "src": [
         "guest"
       ],
@@ -104,7 +72,7 @@
         "host"
       ]
     },
-    "intersect_guest_ids_process": {
+    "intersect_cipher": {
       "src": [
         "host"
       ],
@@ -112,7 +80,15 @@
         "guest"
       ]
     },
-    "intersect_host_ids_process": {
+    "raw_id_list": {
+      "src": [
+        "guest"
+      ],
+      "dst": [
+        "host"
+      ]
+    },
+    "raw_value_list": {
       "src": [
         "host"
       ],
@@ -120,12 +96,28 @@
         "guest"
       ]
     },
-    "rsa_pubkey": {
+    "coverage": {
+      "src": [
+        "guest"
+      ],
+      "dst": [
+        "host"
+      ]
+    },
+    "nonce_list": {
       "src": [
         "host"
       ],
       "dst": [
         "guest"
+      ]
+    },
+    "block_confirm": {
+      "src": [
+        "guest"
+      ],
+      "dst": [
+        "host"
       ]
     }
   }

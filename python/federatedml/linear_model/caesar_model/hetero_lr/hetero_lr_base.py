@@ -40,11 +40,10 @@ class HeteroLRBase(CaesarBase):
         self.model_meta_name = 'HeteroLogisticRegressionMeta'
         self.mode = consts.HETERO
         self.cipher = None
-        self.batch_generator = None
         self.gradient_loss_operator = None
         self.converge_procedure = None
         self.model_param = LogisticRegressionParam()
-        self.features = None
+        # self.features = None
         self.labels = None
 
     def _init_model(self, params: LogisticRegressionParam):
@@ -52,10 +51,6 @@ class HeteroLRBase(CaesarBase):
         self.cipher = PaillierEncrypt()
         self.cipher.generate_key(self.model_param.encrypt_param.key_length)
         self.transfer_variable = CaesarModelTransferVariable()
-        # if self.role == consts.GUEST:
-        #     self.batch_generator.register_batch_generator(self.transfer_variable, has_arbiter=False)
-        # else:
-        #     self.batch_generator.register_batch_generator(self.transfer_variable)
 
     def get_model_summary(self):
         # TODO
@@ -87,7 +82,7 @@ class HeteroLRBase(CaesarBase):
     def cal_prediction(self, w_self, w_remote, features, spdz, suffix):
         raise NotImplementedError("Should not call here")
 
-    def compute_gradient(self, wa, wb, error, suffix):
+    def compute_gradient(self, wa, wb, error, features, suffix):
         raise NotImplementedError("Should not call here")
 
     def transfer_pubkey(self):
@@ -104,11 +99,10 @@ class HeteroLRBase(CaesarBase):
         # self.batch_generator.initialize_batch_generator(data_instances, self.batch_size)
         model_shape = self.get_features_shape(data_instances)
         w = self.initializer.init_model(model_shape, init_params=self.init_param_obj)
-        # last_weight = w
+        self.batch_generator.initialize_batch_generator(data_instances, batch_size=self.batch_size)
+        last_w = w
         if self.role == consts.GUEST:
             self.labels = data_instances.mapValues(lambda x: np.array([x.label], dtype=int))
-        source_features = data_instances.mapValues(lambda x: x.features)
-        LOGGER.debug(f"source_features: {source_features.first()}")
 
         remote_pubkey = self.transfer_pubkey()
         LOGGER.debug(f"n: {remote_pubkey.n}")
@@ -122,44 +116,56 @@ class HeteroLRBase(CaesarBase):
             # self.encrypted_source_features = self.cipher.distribute_encrypt(source_features)
             w_self, w_remote = self.share_init_model(w, self.fix_point_encoder)
 
-
             LOGGER.debug(f"w_self: {w_self.value}, {w_remote.value}")
 
-            self.features = fixedpoint_table.FixedPointTensor(self.fix_point_encoder.encode(source_features),
-                                                              q_field=self.fix_point_encoder.n,
-                                                              endec=self.fix_point_encoder)
+            # self.features = fixedpoint_table.FixedPointTensor(self.fix_point_encoder.encode(source_features),
+            #                                                   q_field=self.fix_point_encoder.n,
+            #                                                   endec=self.fix_point_encoder)
+            batch_data_generator = self.batch_generator.generate_batch_data()
+            encoded_batch_data = []
+            for batch_data in batch_data_generator:
+                batch_features = batch_data.mapValues(lambda x: x.features)
+                encoded_batch_data.append(
+                    fixedpoint_table.FixedPointTensor(self.fix_point_encoder.encode(batch_features),
+                                                      q_field=self.fix_point_encoder.n,
+                                                      endec=self.fix_point_encoder))
+
             while self.n_iter_ < self.max_iter:
-                LOGGER.debug(f"n_iter: {self.n_iter_}")
-                current_suffix = (self.n_iter_,)
-                y = self.cal_prediction(w_self, w_remote, features=self.features, spdz=spdz, suffix=current_suffix)
 
-                if self.role == consts.GUEST:
-                    error = y.value.join(self.labels, operator.sub)
-                    LOGGER.debug(f"error: {error.first()}")
-                    error = fixedpoint_table.FixedPointTensor.from_value(error,
-                                                                         q_field=self.fix_point_encoder.n,
-                                                                         encoder=self.fix_point_encoder)
-                    w_remote, w_self = self.compute_gradient(wa=w_remote, wb=w_self, error=error, suffix=current_suffix)
-                    LOGGER.debug(f"before_reconstruct, w_self: {w_self.value}, w_remote shape: {w_remote.value}")
+                for batch_idx, batch_data in enumerate(encoded_batch_data):
+                    LOGGER.debug(f"n_iter: {self.n_iter_}")
+                    current_suffix = (self.n_iter_, batch_idx)
+                    y = self.cal_prediction(w_self, w_remote, features=batch_data, spdz=spdz, suffix=current_suffix)
 
-                    new_w = w_self.reconstruct_unilateral(tensor_name=f"wb_{self.n_iter_}")
+                    if self.role == consts.GUEST:
+                        error = y.value.join(self.labels, operator.sub)
+                        LOGGER.debug(f"error: {error.first()}")
+                        error = fixedpoint_table.FixedPointTensor.from_value(error,
+                                                                             q_field=self.fix_point_encoder.n,
+                                                                             encoder=self.fix_point_encoder)
+                        w_remote, w_self = self.compute_gradient(wa=w_remote, wb=w_self, error=error,
+                                                                 features=batch_data,
+                                                                 suffix=current_suffix)
 
-                    w_remote.broadcast_reconstruct_share(tensor_name=f"wa_{self.n_iter_}")
+                        new_w = w_self.reconstruct_unilateral(tensor_name=f"wb_{self.n_iter_}")
 
-                else:
-                    w_self, w_remote = self.compute_gradient(wa=w_self, wb=w_remote, error=y, suffix=current_suffix)
-                    w_remote.broadcast_reconstruct_share(tensor_name=f"wb_{self.n_iter_}")
-                    new_w = w_self.reconstruct_unilateral(tensor_name=f"wa_{self.n_iter_}")
-                LOGGER.debug(f"new_w: {new_w}")
-                self.model_weights = LinearModelWeights(l=new_w,
-                                                        fit_intercept=self.model_param.init_param.fit_intercept)
+                        w_remote.broadcast_reconstruct_share(tensor_name=f"wa_{self.n_iter_}")
 
-                w_self, w_remote = self.share_init_model(
-                    new_w, fix_point_encoder=self.fix_point_encoder, n_iter=self.n_iter_)
-                # weight_diff = fate_operator.norm(last_weight - new_w)
-                # if weight_diff < self.model_param.tol:
-                #     self.is_converged = True
-                #     break
+                    else:
+                        w_self, w_remote = self.compute_gradient(wa=w_self, wb=w_remote, error=y,
+                                                                 features=batch_data, suffix=current_suffix)
+                        w_remote.broadcast_reconstruct_share(tensor_name=f"wb_{self.n_iter_}")
+                        new_w = w_self.reconstruct_unilateral(tensor_name=f"wa_{self.n_iter_}")
+                    LOGGER.debug(f"new_w: {new_w}")
+                    self.model_weights = LinearModelWeights(l=new_w,
+                                                            fit_intercept=self.model_param.init_param.fit_intercept)
+
+                    w_self, w_remote = self.share_init_model(
+                        new_w, fix_point_encoder=self.fix_point_encoder, n_iter=self.n_iter_)
+                self.is_converged = self.check_converge(last_w=last_w, new_w=new_w, suffix=(self.n_iter_,))
+                if self.is_converged:
+                    LOGGER.info(f"Model has converged, iter: {self.n_iter_}")
+                    break
                 self.n_iter_ += 1
         self.model_weights = LinearModelWeights(l=new_w, fit_intercept=self.model_param.init_param.fit_intercept)
 
@@ -167,7 +173,6 @@ class HeteroLRBase(CaesarBase):
         if self.role == consts.HOST:
             # for var_name in ["z", "z_square", "z_cube"]:
             for var_name in ["z"]:
-
                 z = kwargs[var_name]
                 encrypt_z = self.cipher.distribute_encrypt(z.value)
                 self.transfer_variable.encrypted_share_matrix.remote(encrypt_z, role=consts.GUEST,
@@ -180,7 +185,7 @@ class HeteroLRBase(CaesarBase):
                     self.other_party,
                     suffix=(var_name,) + suffix)[0]
                 res.append(fixedpoint_table.PaillierFixedPointTensor(
-                    z_table, q_field=self.features.q_field, endec=self.features.endec))
+                    z_table, q_field=self.fix_point_encoder.n, endec=self.fix_point_encoder))
             # return res[0], res[1], res[2]
             return res[0], res[0], res[0]
 

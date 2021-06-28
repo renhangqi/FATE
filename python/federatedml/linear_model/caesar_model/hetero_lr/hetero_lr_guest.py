@@ -16,11 +16,12 @@
 import operator
 
 from federatedml.linear_model.caesar_model.hetero_lr.hetero_lr_base import HeteroLRBase
+from federatedml.optim import activation
 from federatedml.secureprotol.spdz.tensor import fixedpoint_numpy, fixedpoint_table
 from federatedml.util import LOGGER, consts
 from federatedml.util import fate_operator
-from federatedml.optim import activation
 from federatedml.util.io_check import assert_io_num_rows_equal
+import numpy as np
 
 
 class HeteroLRGuest(HeteroLRBase):
@@ -33,7 +34,7 @@ class HeteroLRGuest(HeteroLRBase):
         public_key = self.cipher.public_key
         self.transfer_variable.pubkey.remote(public_key, role=consts.HOST, suffix=("guest_pubkey",))
         remote_pubkey = self.transfer_variable.pubkey.get_parties(parties=self.other_party,
-                                                                suffix=("host_pubkey",))[0]
+                                                                  suffix=("host_pubkey",))[0]
         return remote_pubkey
 
     def cal_prediction(self, w_self, w_remote, features, spdz, suffix):
@@ -43,9 +44,14 @@ class HeteroLRGuest(HeteroLRBase):
         # za_share = self.secure_matrix_mul(w_remote, suffix=("za",) + suffix)
         # zb_share = self.secure_matrix_mul(self.features,
         #                                   cipher=self.cipher, suffix=("zb",) + suffix)
-        za_share = self.secure_matrix_mul(w_remote, cipher=self.cipher, suffix=("za",) + suffix)
-        zb_share = self.secure_matrix_mul(self.features,
-                                          suffix=("zb",) + suffix)
+        # za_share = self.secure_matrix_mul(w_remote, cipher=self.cipher, suffix=("za",) + suffix)
+        za_suffix = ("za",) + suffix
+        self.secure_matrix_mul_active(w_remote, cipher=self.cipher, suffix=za_suffix)
+        # z1 = features.dot_array(w_self.value)
+        za_share = self.received_share_matrix(self.cipher, q_field=self.fix_point_encoder.n,
+                                              encoder=self.fix_point_encoder, suffix=za_suffix)
+        zb_share = self.secure_matrix_mul_passive(features,
+                                                  suffix=("zb",) + suffix)
         z = z1 + za_share + zb_share
 
         # z = z.convert_to_array_tensor()
@@ -65,36 +71,46 @@ class HeteroLRGuest(HeteroLRBase):
         shared_sigmoid_z = self.share_matrix(sigmoid_z, suffix=("sigmoid_z",) + suffix)
         return shared_sigmoid_z
 
-    def compute_gradient(self, wa, wb, error, suffix):
+    def compute_gradient(self, wa, wb, error, features, suffix):
         LOGGER.debug(f"start_wa shape: {wa.value}, wb shape: {wb.value}")
 
         n = error.value.count()
+        encoded_1_n = self.fix_point_encoder.encode(1 / n)
+        error_1_n = error * encoded_1_n
         encrypt_error = fixedpoint_table.PaillierFixedPointTensor.from_value(
             self.transfer_variable.share_error.get(idx=0, suffix=suffix),
             q_field=self.fix_point_encoder.n,
             encoder=self.fix_point_encoder
         )
         encrypt_error = encrypt_error + error
-        encoded_1_n = self.fix_point_encoder.encode(1 / n)
 
-        encrypt_g = encrypt_error.value.join(self.features.value, operator.mul).reduce(operator.add) * encoded_1_n
+        encrypt_g = encrypt_error.value.join(features.value, operator.mul).reduce(operator.add) * encoded_1_n
         encrypt_g = fixedpoint_numpy.PaillierFixedPointTensor(encrypt_g, q_field=error.q_field,
                                                               endec=self.fix_point_encoder)
         gb2 = self.share_matrix(encrypt_g, suffix=("encrypt_g",) + suffix)
 
-        ga2_2 = self.secure_matrix_mul(error * encoded_1_n, cipher=self.cipher,
-                                       suffix=("ga2",) + suffix)
-
-        learning_rate = self.model_param.learning_rate
-
-        gb2 = gb2 * learning_rate
-
-        wb = wb - gb2
-
-        wa = wa - ga2_2.transpose() * learning_rate
+        ga2_suffix = ("ga2",) + suffix
+        self.secure_matrix_mul_active(error_1_n, cipher=self.cipher,
+                                      suffix=ga2_suffix)
+        ga2_2 = self.received_share_matrix(self.cipher, q_field=self.fix_point_encoder.n,
+                                           encoder=self.fix_point_encoder, suffix=ga2_suffix)
+        wb = wb - gb2 * self.model_param.learning_rate
+        wa = wa - ga2_2.transpose() * self.model_param.learning_rate
         wa = wa.reshape(wa.shape[-1])
 
         return wa, wb
+
+    def check_converge(self, last_w, new_w, suffix):
+        square_sum = np.sum((last_w - new_w) ** 2)
+        host_sums = self.converge_transfer_variable.square_sum.get(suffix=suffix)
+        for hs in host_sums:
+            square_sum += hs
+        norm_diff = np.sqrt(square_sum)
+        is_converge = False
+        if norm_diff < self.model_param.tol:
+            is_converge = True
+        self.converge_transfer_variable.converge_info.remote(is_converge, role=consts.HOST, suffix=suffix)
+        return is_converge
 
     @assert_io_num_rows_equal
     def predict(self, data_instances):
@@ -114,7 +130,7 @@ class HeteroLRGuest(HeteroLRBase):
         data_instances = self.align_data_header(data_instances, self.header)
 
         pred_prob = data_instances.mapValues(lambda v: fate_operator.vec_dot(v.features, self.model_weights.coef_)
-                                                        + self.model_weights.intercept_)
+                                                       + self.model_weights.intercept_)
         # pred_prob = self.compute_wx(data_instances, self.model_weights.coef_, self.model_weights.intercept_)
         host_probs = self.transfer_variable.host_prob.get(idx=-1)
 
