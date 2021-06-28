@@ -16,10 +16,10 @@
 #  limitations under the License.
 #
 
-import random
-
-from federatedml.secureprotol import gmpy_math
+from collections.abc import Mapping
 from federatedml.secureprotol.fixedpoint import FixedPointNumber
+from federatedml.secureprotol import gmpy_math
+import random
 from federatedml.util import LOGGER
 
 
@@ -51,7 +51,6 @@ class PaillierKeypair(object):
 class PaillierPublicKey(object):
     """Contains a public key and associated encryption methods.
     """
-
     def __init__(self, n):
         self.g = n + 1
         self.n = n
@@ -113,7 +112,6 @@ class PaillierPublicKey(object):
 class PaillierPrivateKey(object):
     """Contains a private key and associated decryption method.
     """
-
     def __init__(self, public_key, p, q):
         if not p * q == public_key.n:
             raise ValueError("given public key does not match the given p and q")
