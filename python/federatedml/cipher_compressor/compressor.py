@@ -1,4 +1,4 @@
-import math
+import numpy as np
 from abc import ABC
 from abc import abstractmethod
 from federatedml.util import LOGGER
@@ -54,7 +54,7 @@ class PackingCipherTensor(object):
 
     def __init__(self, ciphers):
 
-        if type(ciphers) == list:
+        if type(ciphers) == list or type(ciphers) == np.ndarray:
             if len(ciphers) == 1:
                 self.ciphers = ciphers[0]
             else:
@@ -139,6 +139,7 @@ class NormalCipherPackage(CipherPackage):
     def unpack(self, decrypter):
 
         if type(decrypter) == PaillierEncrypt:
+            # assert 1 == 2, f"self._cipher_text: {self._cipher_text}"
             compressed_plain_text = decrypter.privacy_key.raw_decrypt(self._cipher_text.ciphertext())
         elif type(decrypter) == IterativeAffineEncrypt:
             compressed_plain_text = decrypter.key.raw_decrypt(self._cipher_text)
@@ -186,6 +187,8 @@ class PackingCipherTensorPackage(CipherPackage):
         if self.normal_package.has_space():
             if obj.dim == 1:
                 self.normal_package.add(obj.ciphers)
+                if type(self.normal_package._cipher_text) == list:
+                    raise ValueError('error format {}'.format(self.normal_package._cipher_text))
             else:
                 self.cached_list.extend(obj.ciphers[:-1])
                 self.not_compress_len = len(obj.ciphers[:-1])
@@ -195,6 +198,7 @@ class PackingCipherTensorPackage(CipherPackage):
 
     def unpack(self, decrypter):
 
+        LOGGER.debug('cwj {}'.format(self.normal_package._cipher_text))
         compressed_part = self.normal_package.unpack(decrypter)
         de_rs = []
         if len(self.cached_list) != 0:

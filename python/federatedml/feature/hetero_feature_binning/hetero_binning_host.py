@@ -17,7 +17,7 @@
 import functools
 import operator
 
-from federatedml.cipher_compressor import compressor
+from federatedml.cipher_compressor.compressor import CipherCompressorHost
 from federatedml.feature.hetero_feature_binning.base_feature_binning import BaseFeatureBinning
 from federatedml.secureprotol.fate_paillier import PaillierEncryptedNumber
 from federatedml.util import LOGGER
@@ -25,6 +25,10 @@ from federatedml.util import consts
 
 
 class HeteroFeatureBinningHost(BaseFeatureBinning):
+    def __init__(self):
+        super(HeteroFeatureBinningHost, self).__init__()
+        self.compressor = None
+
     def fit(self, data_instances):
         """
         Apply binning method for both data instances in local party as well as the other one. Afterwards, calculate
@@ -47,6 +51,7 @@ class HeteroFeatureBinningHost(BaseFeatureBinning):
             return data_instances
 
         if not self.model_param.local_only:
+            self.compressor = CipherCompressorHost()
             self._sync_init_bucket(data_instances, split_points)
             if self.model_param.method == consts.OPTIMAL:
                 self.optimal_binning_sync()
@@ -69,7 +74,8 @@ class HeteroFeatureBinningHost(BaseFeatureBinning):
         LOGGER.info("Get encrypted_label_table from guest")
 
         encrypted_bin_sum = self.__static_encrypted_bin_label(data_bin_table, encrypted_label_table)
-
+        LOGGER.debug(f"Before compress, encrypted_bin_sum: {encrypted_bin_sum.first()}")
+        encrypted_bin_sum = self.compressor.compress_dtable(encrypted_bin_sum)
         encode_name_f = functools.partial(self.bin_inner_param.encode_col_name_dict,
                                           model=self,
                                           col_name_maps=self.bin_inner_param.col_name_maps)
@@ -78,6 +84,8 @@ class HeteroFeatureBinningHost(BaseFeatureBinning):
 
         self.header_anonymous = self.bin_inner_param.encode_col_name_list(self.header, self)
         # encrypted_bin_sum = self.cipher_compress(encrypted_bin_sum, data_bin_table.count())
+        LOGGER.debug(f"Before_remote, encrypted_bin_sum: {encrypted_bin_sum.first()}")
+
         self.transfer_variable.encrypted_bin_sum.remote(encrypted_bin_sum,
                                                         role=consts.GUEST,
                                                         idx=0)
