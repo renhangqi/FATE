@@ -80,12 +80,15 @@ class ModelBase(object):
         # self.need_run = need_run
         self.component_properties.need_run = need_run
 
-    def run(self, component_parameters=None, args=None):
+    def warm_start(self, component_parameters=None, args=None):
         self._init_runtime_parameters(component_parameters)
         self.component_properties.parse_dsl_args(args)
-
-        running_funcs = self.component_properties.extract_running_rules(args, self)
+        train_data, validate_data, test_data, data = self.component_properties.extract_input_data(args, self)
+        running_funcs = self.component_properties.warm_start_process(args, self, train_data, validate_data)
         LOGGER.debug(f"running_funcs: {running_funcs.todo_func_list}")
+        self._execute_running_funcs(running_funcs)
+
+    def _execute_running_funcs(self, running_funcs):
         saved_result = []
         for func, params, save_result, use_previews in running_funcs:
             # for func, params in zip(todo_func_list, todo_func_params):
@@ -105,11 +108,16 @@ class ModelBase(object):
 
         if len(saved_result) == 1:
             self.data_output = saved_result[0]
-            # LOGGER.debug("One data: {}".format(self.data_output.first()[1].features))
         LOGGER.debug("saved_result is : {}, data_output: {}".format(saved_result, self.data_output))
-        # self.check_consistency()
         self.save_summary()
-        # LOGGER.debug(f"data_output count: {self.data_output.count()}")
+
+    def run(self, component_parameters=None, args=None):
+        self._init_runtime_parameters(component_parameters)
+        self.component_properties.parse_dsl_args(args)
+
+        running_funcs = self.component_properties.extract_running_rules(args, self)
+        LOGGER.debug(f"running_funcs: {running_funcs.todo_func_list}")
+        self._execute_running_funcs(running_funcs)
 
     def get_metrics_param(self):
         return EvaluateParam(eval_type="binary",

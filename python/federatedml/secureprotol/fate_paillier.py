@@ -17,6 +17,7 @@
 #
 
 from collections.abc import Mapping
+import numpy as np
 from federatedml.secureprotol.fixedpoint import FixedPointNumber
 from federatedml.secureprotol import gmpy_math
 import random
