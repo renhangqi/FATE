@@ -264,6 +264,21 @@ class CommonFilterParam(BaseParam):
             self.check_boolean(v, descr)
 
 
+class IVFilterParam(CommonFilterParam):
+    """
+    Parameters
+    ----------
+    mul_class_merge_type: str or list, default: "average"
+        Indicate how to merge multi-class iv results. Support "average", "min" and "max".
+
+    """
+    def __init__(self, filter_type='threshold', threshold=1,
+                 host_thresholds=None, select_federated=True, mul_class_merge_type="average"):
+        super().__init__(metrics='iv', filter_type=filter_type, take_high=True, threshold=threshold,
+                         host_thresholds=host_thresholds, select_federated=select_federated)
+        self.mul_class_merge_type = mul_class_merge_type
+
+
 class CorrelationFilterParam(BaseParam):
     """
     This filter follow this specific rules:
@@ -445,7 +460,7 @@ class FeatureSelectionParam(BaseParam):
                  outlier_param=OutlierColsSelectionParam(),
                  manually_param=ManuallyFilterParam(),
                  percentage_value_param=PercentageValueParam(),
-                 iv_param=CommonFilterParam(metrics=consts.IV),
+                 iv_param=IVFilterParam(),
                  statistic_param=CommonFilterParam(metrics=consts.MEAN),
                  psi_param=CommonFilterParam(metrics=consts.PSI,
                                              take_high=False),

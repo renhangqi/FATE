@@ -115,13 +115,6 @@ class HeteroFeatureBinningGuest(BaseFeatureBinning):
         for host_idx, encrypted_bin_info in enumerate(encrypted_bin_infos):
             host_party_id = self.component_properties.host_party_idlist[host_idx]
             encrypted_bin_sum = encrypted_bin_sum_infos[host_idx]
-
-            # TODO: New decompress
-            # result_counts_table = self.cipher_decompress(encrypted_bin_sum, cipher)
-            # encrypted_bin_sum = dict(encrypted_bin_sum.collect())
-            # result_counts_table = self.__decrypt_bin_sum(encrypted_bin_sum, cipher)
-            LOGGER.debug(f"encrypted_bin_sum: {encrypted_bin_sum.first()}")
-
             result_counts_table = self._packer.decrypt_cipher_package_and_unpack(encrypted_bin_sum)
             LOGGER.debug(f"unpack result: {result_counts_table.first()}")
             bin_result = self.cal_bin_results(data_instances=data_instances,
@@ -130,6 +123,7 @@ class HeteroFeatureBinningGuest(BaseFeatureBinning):
                                               result_counts_table=result_counts_table,
                                               result_counts=result_counts,
                                               label_elements=label_elements)
+            bin_result.set_role_party(role=consts.HOST, party_id=host_party_id)
             self.host_results.append(bin_result)
 
     def host_optimal_binning(self, data_instances, host_idx, encrypted_bin_info, result_counts, category_names):
@@ -179,21 +173,6 @@ class HeteroFeatureBinningGuest(BaseFeatureBinning):
             bin_res = self.iv_calculator.cal_iv_from_counts(result_counts_table,
                                                             label_elements)
         return bin_res
-
-    def cipher_decompress(self, encrypted_bin_sum, cipher):
-
-        def _decompress(col_dict):
-            _decompressor = CipherDecompressor(encrypter=cipher)
-            event_counts = _decompressor.unpack(col_dict["event_counts"])
-            event_counts = [int(x) for x in event_counts]
-            non_event_counts = _decompressor.unpack(col_dict["non_event_counts"])
-            non_event_counts = [int(x) for x in non_event_counts]
-            res = list(zip(event_counts, non_event_counts))
-            return res
-
-        encrypted_bin_sum = encrypted_bin_sum.mapValues(_decompress)
-        # return self.convert_decompress_format(encrypted_bin_sum)
-        return encrypted_bin_sum
 
     @staticmethod
     def convert_decompress_format(encrypted_bin_sum):

@@ -325,8 +325,6 @@ class ComponentProperties(object):
             return self.warm_start_process(args, model, train_data, validate_data, schema)
 
         if self.has_model or self.has_isometric_model:
-            return self.warm_start_process(args, model, train_data, validate_data, schema)
-
             running_funcs.add_func(model.load_model, [args])
 
         if self.need_explain:

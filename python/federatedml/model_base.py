@@ -80,7 +80,7 @@ class ModelBase(object):
         # self.need_run = need_run
         self.component_properties.need_run = need_run
 
-    def warm_start(self, component_parameters=None, args=None):
+    def retry_run(self, component_parameters=None, args=None):
         self._init_runtime_parameters(component_parameters)
         self.component_properties.parse_dsl_args(args)
         train_data, validate_data, test_data, data = self.component_properties.extract_input_data(args, self)

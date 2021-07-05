@@ -3,13 +3,9 @@
     "param_class" : "federatedml/param/feature_selection_param.py/FeatureSelectionParam",
     "role":
     {
-        "guest":
+        "guest|host":
         {
-            "program": "feature_selection_guest.py/HeteroFeatureSelectionGuest"
-        },
-        "host":
-        {
-            "program": "feature_selection_host.py/HeteroFeatureSelectionHost"
+            "program": "base_feature_selection.py/BaseHeteroFeatureSelection"
         }
     }
 }
