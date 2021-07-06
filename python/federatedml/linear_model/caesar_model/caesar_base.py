@@ -136,7 +136,7 @@ class CaesarBase(BaseLinearModel, ABC):
         share = self.transfer_variable.share_matrix.get_parties(parties=self.other_party,
                                                                 suffix=curt_suffix)[0]
         if isinstance(share, np.ndarray):
-            xy = matrix.dot_array(share)
+            xy = matrix.dot_array(share, fit_intercept=self.fit_intercept)
         else:
             share_tensor = fixedpoint_table.PaillierFixedPointTensor.from_value(
                 share, q_field=matrix.q_field, encoder=matrix.endec)
@@ -173,7 +173,7 @@ class CaesarBase(BaseLinearModel, ABC):
 
             # xy = matrix.dot_array(share)
             if isinstance(share, np.ndarray):
-                xy = matrix.dot_array(share)
+                xy = matrix.dot_array(share, fit_intercept=self.fit_intercept)
             else:
                 share_tensor = fixedpoint_table.PaillierFixedPointTensor.from_value(
                     share, q_field=matrix.q_field, encoder=matrix.endec)

@@ -112,9 +112,14 @@ class FixedPointTensor(TensorBase):
         res = table_dot(self.value, other.value)
         return fixedpoint_numpy.FixedPointTensor(res, self.q_field, self.endec, target_name)
 
-    def dot_array(self, array):
+    def dot_array(self, array, fit_intercept=False):
         def _dot(x):
-            res = fate_operator.vec_dot(x, array)
+            if fit_intercept:
+                coef = array[:-1]
+                bias = array[-1]
+                res = fate_operator.vec_dot(x, coef) + bias
+            else:
+                res = fate_operator.vec_dot(x, array)
 
             if not isinstance(res, np.ndarray):
                 res = np.array([res])
@@ -271,7 +276,7 @@ class PaillierFixedPointTensor(FixedPointTensor):
             other = self.endec.encode(other)
             z_value = _table_scalar_op(self.value, other, op)
             return self._boxed(z_value)
-        elif isinstance(other, (int, np.int)):
+        elif isinstance(other, (int, np.int, FixedPointNumber)):
             z_value = _table_scalar_op(self.value, other, op)
             return self._boxed(z_value)
 

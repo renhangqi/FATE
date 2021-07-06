@@ -19,6 +19,7 @@ from federatedml.linear_model.caesar_model.hetero_lr.hetero_lr_base import Heter
 from federatedml.secureprotol.spdz.tensor import fixedpoint_table, fixedpoint_numpy
 from federatedml.util import consts, LOGGER
 from federatedml.util import fate_operator
+import copy
 import numpy as np
 
 
@@ -33,6 +34,12 @@ class HeteroLRHost(HeteroLRBase):
         remote_pubkey = self.transfer_variable.pubkey.get_parties(parties=self.other_party,
                                                                   suffix=("guest_pubkey",))[0]
         return remote_pubkey
+
+    def _init_w(self, model_shape):
+        # init_param_obj = copy.deepcopy(self.init_param_obj)
+        # init_param_obj.fit_intercept = False
+        self.init_param_obj.fit_intercept = False
+        return self.initializer.init_model(model_shape, init_params=self.init_param_obj)
 
     def cal_prediction(self, w_self, w_remote, features, spdz, suffix):
         # za_share = self.secure_matrix_mul(self.features, cipher=self.cipher, suffix=("za",) + suffix)
@@ -63,6 +70,9 @@ class HeteroLRHost(HeteroLRBase):
         LOGGER.debug(f"gb1_value: {gb1.value}")
         encoded_1_n = self.fix_point_encoder.encode(1 / n)
         ga = error.value.join(features.value, operator.mul).reduce(operator.add) * encoded_1_n
+        # if self.fit_intercept:
+        #     bias = error.value.reduce(operator.add) * encoded_1_n
+        #     ga = np.array(list(ga) + [bias])
         ga = fixedpoint_numpy.FixedPointTensor(ga, q_field=error.q_field,
                                                endec=self.fix_point_encoder)
         ga2_1 = self.secure_matrix_mul_passive(features, suffix=("ga2",) + suffix)

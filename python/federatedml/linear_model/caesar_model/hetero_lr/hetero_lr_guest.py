@@ -39,12 +39,8 @@ class HeteroLRGuest(HeteroLRBase):
 
     def cal_prediction(self, w_self, w_remote, features, spdz, suffix):
         # n = features.value.count()
-        z1 = features.dot_array(w_self.value)
+        z1 = features.dot_array(w_self.value, fit_intercept=self.fit_intercept)
 
-        # za_share = self.secure_matrix_mul(w_remote, suffix=("za",) + suffix)
-        # zb_share = self.secure_matrix_mul(self.features,
-        #                                   cipher=self.cipher, suffix=("zb",) + suffix)
-        # za_share = self.secure_matrix_mul(w_remote, cipher=self.cipher, suffix=("za",) + suffix)
         za_suffix = ("za",) + suffix
         self.secure_matrix_mul_active(w_remote, cipher=self.cipher, suffix=za_suffix)
         # z1 = features.dot_array(w_self.value)
@@ -85,6 +81,9 @@ class HeteroLRGuest(HeteroLRBase):
         encrypt_error = encrypt_error + error
 
         encrypt_g = encrypt_error.value.join(features.value, operator.mul).reduce(operator.add) * encoded_1_n
+        if self.fit_intercept:
+            bias = encrypt_error.value.reduce(operator.add) * encoded_1_n
+            encrypt_g = np.array(list(encrypt_g) + list(bias))
         encrypt_g = fixedpoint_numpy.PaillierFixedPointTensor(encrypt_g, q_field=error.q_field,
                                                               endec=self.fix_point_encoder)
         gb2 = self.share_matrix(encrypt_g, suffix=("encrypt_g",) + suffix)
@@ -94,6 +93,9 @@ class HeteroLRGuest(HeteroLRBase):
                                       suffix=ga2_suffix)
         ga2_2 = self.received_share_matrix(self.cipher, q_field=self.fix_point_encoder.n,
                                            encoder=self.fix_point_encoder, suffix=ga2_suffix)
+        # if self.fit_intercept:
+        #     bias = error.value.reduce(operator.add) * encoded_1_n
+        #     ga2_2.value = np.array(list(ga2_2.value) + list(bias))
         wb = wb - gb2 * self.model_param.learning_rate
         wa = wa - ga2_2.transpose() * self.model_param.learning_rate
         wa = wa.reshape(wa.shape[-1])

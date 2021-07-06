@@ -92,13 +92,16 @@ class HeteroLRBase(CaesarBase):
         self.header = data_instances.schema["header"]
         self.fit_binary(data_instances, validate_data)
 
+    def _init_w(self, model_shape):
+        return self.initializer.init_model(model_shape, init_params=self.init_param_obj)
+
     def fit_binary(self, data_instances, validate_data=None):
         LOGGER.info("Start to caesar hetero_lr")
 
         self.validation_strategy = self.init_validation_strategy(data_instances, validate_data)
         # self.batch_generator.initialize_batch_generator(data_instances, self.batch_size)
         model_shape = self.get_features_shape(data_instances)
-        w = self.initializer.init_model(model_shape, init_params=self.init_param_obj)
+        w = self._init_w(model_shape)
         self.batch_generator.initialize_batch_generator(data_instances, batch_size=self.batch_size)
         last_w = w
         if self.role == consts.GUEST:
