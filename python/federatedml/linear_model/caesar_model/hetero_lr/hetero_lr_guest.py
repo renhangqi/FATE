@@ -111,6 +111,7 @@ class HeteroLRGuest(HeteroLRBase):
         is_converge = False
         if norm_diff < self.model_param.tol:
             is_converge = True
+        LOGGER.debug(f"n_iter: {self.n_iter_}, diff: {norm_diff}")
         self.converge_transfer_variable.converge_info.remote(is_converge, role=consts.HOST, suffix=suffix)
         return is_converge
 

@@ -166,6 +166,7 @@ class HeteroLRBase(CaesarBase):
                     w_self, w_remote = self.share_init_model(
                         new_w, fix_point_encoder=self.fix_point_encoder, n_iter=self.n_iter_)
                 self.is_converged = self.check_converge(last_w=last_w, new_w=new_w, suffix=(self.n_iter_,))
+                last_w = new_w
                 if self.is_converged:
                     LOGGER.info(f"Model has converged, iter: {self.n_iter_}")
                     break

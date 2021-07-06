@@ -86,7 +86,7 @@ def main(config="../../config.yaml", namespace=""):
         "name": "hetero_lr_0",
         "penalty": "L2",
         "optimizer": "rmsprop",
-        "tol": 0.0001,
+        "tol": 0.01,
         "alpha": 0.01,
         "max_iter": 100,
         "early_stop": "diff",
