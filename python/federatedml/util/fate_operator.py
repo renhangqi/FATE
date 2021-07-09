@@ -75,6 +75,13 @@ def vec_dot(x, w):
     return new_data
 
 
+def compute_wx(x, w, fit_intercept=False):
+    if fit_intercept:
+        return vec_dot(x, w[:-1]) + w[-1]
+    else:
+        return vec_dot(x, w)
+
+
 def reduce_add(x, y):
     if x is None and y is None:
         return None

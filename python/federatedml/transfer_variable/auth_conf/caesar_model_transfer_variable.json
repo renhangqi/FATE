@@ -45,6 +45,14 @@
         "host",
         "guest"
       ]
+    },
+    "encrypted_host_weights": {
+      "src": [
+        "guest"
+      ],
+      "dst": [
+        "host"
+      ]
     }
   }
 }

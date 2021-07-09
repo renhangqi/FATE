@@ -16,23 +16,26 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import copy
 import operator
+from abc import ABC
 
 import numpy as np
 
 from federatedml.linear_model.caesar_model.caesar_base import CaesarBase
 from federatedml.linear_model.linear_model_weight import LinearModelWeights
 from federatedml.param.caesar_param import LogisticRegressionParam
-from federatedml.protobuf.generated import lr_model_meta_pb2, lr_model_param_pb2
+from federatedml.protobuf.generated import lr_model_meta_pb2
 from federatedml.secureprotol import PaillierEncrypt
 from federatedml.secureprotol.spdz import SPDZ
+from federatedml.param.logistic_regression_param import InitParam
 from federatedml.secureprotol.spdz.tensor import fixedpoint_numpy, fixedpoint_table
 from federatedml.transfer_variable.transfer_class.caesar_model_transfer_variable import CaesarModelTransferVariable
 from federatedml.util import LOGGER
 from federatedml.util import consts
 
 
-class HeteroLRBase(CaesarBase):
+class HeteroLRBase(CaesarBase, ABC):
     def __init__(self):
         super().__init__()
         self.model_name = 'HeteroLogisticRegression'
@@ -45,6 +48,7 @@ class HeteroLRBase(CaesarBase):
         self.model_param = LogisticRegressionParam()
         # self.features = None
         self.labels = None
+        self.hosted_model_weights = None
 
     def _init_model(self, params: LogisticRegressionParam):
         super()._init_model(params)
@@ -55,6 +59,10 @@ class HeteroLRBase(CaesarBase):
     def get_model_summary(self):
         # TODO
         return
+
+    @property
+    def is_respectively_reviewed(self):
+        return self.model_param.review_strategy == "respectively"
 
     def share_init_model(self, w, fix_point_encoder, n_iter=-1):
         source = [w, self.other_party]
@@ -89,7 +97,7 @@ class HeteroLRBase(CaesarBase):
         raise NotImplementedError("Should not call here")
 
     def fit(self, data_instances, validate_data=None):
-        self.header = data_instances.schema["header"]
+        self.header = data_instances.schema.get("header", [])
         self.fit_binary(data_instances, validate_data)
 
     def _init_w(self, model_shape):
@@ -103,14 +111,14 @@ class HeteroLRBase(CaesarBase):
         model_shape = self.get_features_shape(data_instances)
         w = self._init_w(model_shape)
         self.batch_generator.initialize_batch_generator(data_instances, batch_size=self.batch_size)
-        last_w = w
+        last_models = [w, self.hosted_model_weights]
         if self.role == consts.GUEST:
             self.labels = data_instances.mapValues(lambda x: np.array([x.label], dtype=int))
 
         remote_pubkey = self.transfer_pubkey()
         LOGGER.debug(f"n: {remote_pubkey.n}")
         with SPDZ(
-                "pearson",
+                "caesar_lr",
                 local_party=self.local_party,
                 all_parties=self.parties,
                 use_mix_rand=self.model_param.use_mix_rand,
@@ -149,29 +157,51 @@ class HeteroLRBase(CaesarBase):
                         w_remote, w_self = self.compute_gradient(wa=w_remote, wb=w_self, error=error,
                                                                  features=batch_data,
                                                                  suffix=current_suffix)
-
-                        new_w = w_self.reconstruct_unilateral(tensor_name=f"wb_{self.n_iter_}")
-
-                        w_remote.broadcast_reconstruct_share(tensor_name=f"wa_{self.n_iter_}")
-
                     else:
                         w_self, w_remote = self.compute_gradient(wa=w_self, wb=w_remote, error=y,
                                                                  features=batch_data, suffix=current_suffix)
-                        w_remote.broadcast_reconstruct_share(tensor_name=f"wb_{self.n_iter_}")
-                        new_w = w_self.reconstruct_unilateral(tensor_name=f"wa_{self.n_iter_}")
+                    new_w = self.review_models(w_self, w_remote)
                     LOGGER.debug(f"new_w: {new_w}")
                     self.model_weights = LinearModelWeights(l=new_w,
                                                             fit_intercept=self.model_param.init_param.fit_intercept)
 
-                    w_self, w_remote = self.share_init_model(
-                        new_w, fix_point_encoder=self.fix_point_encoder, n_iter=self.n_iter_)
-                self.is_converged = self.check_converge(last_w=last_w, new_w=new_w, suffix=(self.n_iter_,))
-                last_w = new_w
+                    # w_self, w_remote = self.share_init_model(
+                    #     new_w, fix_point_encoder=self.fix_point_encoder, n_iter=self.n_iter_)
+                self.is_converged = self.check_converge(last_w=last_models, new_w=new_w, suffix=(self.n_iter_,))
+                last_models = [new_w, copy.deepcopy(self.hosted_model_weights)]
                 if self.is_converged:
                     LOGGER.info(f"Model has converged, iter: {self.n_iter_}")
                     break
                 self.n_iter_ += 1
-        self.model_weights = LinearModelWeights(l=new_w, fit_intercept=self.model_param.init_param.fit_intercept)
+
+    def review_models(self, w_self, w_remote):
+        if self.model_param.review_strategy == "respectively":
+            if self.role == consts.GUEST:
+                new_w = w_self.reconstruct_unilateral(tensor_name=f"wb_{self.n_iter_}")
+                w_remote.broadcast_reconstruct_share(tensor_name=f"wa_{self.n_iter_}")
+            else:
+                w_remote.broadcast_reconstruct_share(tensor_name=f"wb_{self.n_iter_}")
+                new_w = w_self.reconstruct_unilateral(tensor_name=f"wa_{self.n_iter_}")
+
+        elif self.model_param.review_strategy == "all_review_in_guest":
+
+            if self.role == consts.GUEST:
+                new_w = w_self.reconstruct_unilateral(tensor_name=f"wb_{self.n_iter_}")
+                hosted_weights = w_remote.reconstruct_unilateral(tensor_name=f"wa_{self.n_iter_}")
+                self.hosted_model_weights = LinearModelWeights(l=hosted_weights, fit_intercept=False)
+            else:
+                if w_remote.shape[0] > 2:
+                    raise ValueError("Too many features in Guest. Review strategy: 'all_review_in_guest' "
+                                     "should not be used.")
+                w_remote.broadcast_reconstruct_share(tensor_name=f"wb_{self.n_iter_}")
+
+                w_self.broadcast_reconstruct_share(tensor_name=f"wa_{self.n_iter_}")
+                new_w = np.zeros(w_self.shape)
+        else:
+            raise NotImplementedError(f"review strategy: {self.model_param.review_strategy} has not been implemented.")
+        self.model_weights = LinearModelWeights(l=new_w,
+                                                fit_intercept=self.model_param.init_param.fit_intercept)
+        return new_w
 
     def share_z(self, suffix, **kwargs):
         if self.role == consts.HOST:
@@ -193,10 +223,6 @@ class HeteroLRBase(CaesarBase):
             # return res[0], res[1], res[2]
             return res[0], res[0], res[0]
 
-    def _get_param(self):
-        param_protobuf_obj = lr_model_param_pb2.LRModelParam()
-        return param_protobuf_obj
-
     def _get_meta(self):
         meta_protobuf_obj = lr_model_meta_pb2.LRModelMeta(penalty=self.model_param.penalty,
                                                           tol=self.model_param.tol,
@@ -207,5 +233,53 @@ class HeteroLRBase(CaesarBase):
                                                           max_iter=self.max_iter,
                                                           early_stop=self.model_param.early_stop,
                                                           fit_intercept=self.fit_intercept,
-                                                          need_one_vs_rest=self.need_one_vs_rest)
+                                                          need_one_vs_rest=self.need_one_vs_rest,
+                                                          review_strategy=self.model_param.review_strategy)
         return meta_protobuf_obj
+
+    def get_single_model_param(self, model_weights=None, header=None):
+        weight_dict = {}
+        model_weights = model_weights if model_weights else self.model_weights
+        header = header if header else self.header
+        for idx, header_name in enumerate(header):
+            coef_i = model_weights.coef_[idx]
+            weight_dict[header_name] = coef_i
+
+        result = {'iters': self.n_iter_,
+                  'loss_history': self.loss_history,
+                  'is_converged': self.is_converged,
+                  'weight': weight_dict,
+                  'intercept': self.model_weights.intercept_,
+                  'header': header,
+                  'best_iteration': -1 if self.validation_strategy is None else
+                  self.validation_strategy.best_iteration
+                  }
+        return result
+
+    def load_model(self, model_dict):
+        LOGGER.debug("Start Loading model")
+        result_obj = list(model_dict.get('model').values())[0].get(self.model_param_name)
+        meta_obj = list(model_dict.get('model').values())[0].get(self.model_meta_name)
+        # self.fit_intercept = meta_obj.fit_intercept
+        if self.init_param_obj is None:
+            self.init_param_obj = InitParam()
+        self.init_param_obj.fit_intercept = meta_obj.fit_intercept
+        self.header = list(result_obj.header)
+        # For hetero-lr arbiter predict function
+        self.load_single_model(result_obj)
+        self.model_param.review_strategy = meta_obj.review_strategy
+
+    def load_single_model(self, single_model_obj):
+        LOGGER.info("It's a binary task, start to load single model")
+        feature_shape = len(self.header)
+        tmp_vars = np.zeros(feature_shape)
+        weight_dict = dict(single_model_obj.weight)
+
+        for idx, header_name in enumerate(self.header):
+            tmp_vars[idx] = weight_dict.get(header_name)
+
+        if self.fit_intercept:
+            tmp_vars = np.append(tmp_vars, single_model_obj.intercept)
+        self.model_weights = LinearModelWeights(tmp_vars, fit_intercept=self.fit_intercept)
+        self.n_iter_ = single_model_obj.iters
+        return self

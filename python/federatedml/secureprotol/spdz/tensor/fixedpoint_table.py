@@ -32,6 +32,7 @@ from federatedml.util import fate_operator
 
 def _table_binary_op(x, y, q_field, op):
     # return x.join(y, lambda a, b: op(a, b) % q_field)
+    LOGGER.debug(f"x: {x.first()}, y: {y.first()}")
     return x.join(y, lambda a, b: op(a, b))
 
 
@@ -105,6 +106,10 @@ class FixedPointTensor(TensorBase):
         cross = self.endec.truncate(cross, self.get_spdz().party_idx)
         share = fixedpoint_numpy.FixedPointTensor(cross, self.q_field, self.endec, target_name)
         return share
+
+    @property
+    def shape(self):
+        return self.value.count(), len(self.value.first()[1])
 
     def dot_local(self, other: 'FixedPointTensor', target_name=None):
         if target_name is None:

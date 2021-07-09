@@ -95,18 +95,28 @@ class LogisticRegressionParam(BaseParam):
                                e.g.: convert an x to round(x * 2**floating_point_precision) during Paillier operation, divide
                                       the result by 2**floating_point_precision in the end.
 
+    review_strategy: str, "respectively", "all_review_in_guest", default: "respectively"
+        "respectively": Means guest and host can review their own part of weights only.
+        "all_review_in_guest": All the weights will be reviewed in guest only.
+            This is use to protect the situation that, guest provided label only.
+            Since if host obtain the model weights, it can use this model to steal
+            label info of guest. However, to protect host's info, this function works
+            only when guest provide no features. If there is any feature has been provided
+            in Guest, this param is illegal.
+
     """
 
     def __init__(self, penalty='L2',
                  tol=1e-4, alpha=1.0, optimizer='rmsprop',
                  batch_size=-1, learning_rate=0.01, init_param=InitParam(),
                  max_iter=100, early_stop='diff', encrypt_param=EncryptParam(),
-                 predict_param=PredictParam(), cv_param=CrossValidationParam(),
+                 predict_param=PredictParam(),
                  decay=1, decay_sqrt=True,
                  multi_class='ovr', validation_freqs=None, early_stopping_rounds=None,
                  stepwise_param=StepwiseParam(), floating_point_precision=23,
                  metrics=None,
-                 use_first_metric_only=False, use_mix_rand=False
+                 use_first_metric_only=False, use_mix_rand=False,
+                 random_field=1 << 20, review_strategy="respectively"
                  ):
         super(LogisticRegressionParam, self).__init__()
         self.penalty = penalty
@@ -120,7 +130,7 @@ class LogisticRegressionParam(BaseParam):
         self.early_stop = early_stop
         self.encrypt_param = encrypt_param
         self.predict_param = copy.deepcopy(predict_param)
-        self.cv_param = copy.deepcopy(cv_param)
+        self.random_field = random_field
         self.decay = decay
         self.decay_sqrt = decay_sqrt
         self.multi_class = multi_class
@@ -131,6 +141,7 @@ class LogisticRegressionParam(BaseParam):
         self.use_first_metric_only = use_first_metric_only
         self.floating_point_precision = floating_point_precision
         self.use_mix_rand = use_mix_rand
+        self.review_strategy = review_strategy
 
     def check(self):
         descr = "logistic_param's"

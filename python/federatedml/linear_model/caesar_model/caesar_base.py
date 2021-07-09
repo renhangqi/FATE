@@ -135,7 +135,11 @@ class CaesarBase(BaseLinearModel, ABC):
         curt_suffix = ("secure_matrix_mul",) + suffix
         share = self.transfer_variable.share_matrix.get_parties(parties=self.other_party,
                                                                 suffix=curt_suffix)[0]
-        if isinstance(share, np.ndarray):
+        LOGGER.debug(f"suffix: {suffix}, share: {share}")
+        if isinstance(share, np.ndarray) and len(share) == 0:
+            xy = matrix.value.mapValues(lambda x: np.array([0]))
+            xy = fixedpoint_table.FixedPointTensor.from_value(xy, q_field=matrix.q_field, encoder=matrix.endec)
+        elif isinstance(share, np.ndarray):
             xy = matrix.dot_array(share, fit_intercept=self.fit_intercept)
         else:
             share_tensor = fixedpoint_table.PaillierFixedPointTensor.from_value(
@@ -162,16 +166,7 @@ class CaesarBase(BaseLinearModel, ABC):
         else:
             share = self.transfer_variable.share_matrix.get_parties(parties=self.other_party,
                                                                     suffix=curt_suffix)[0]
-            # share_tensor = fixedpoint_table.PaillierFixedPointTensor.from_value(
-            #     share, q_field=matrix.q_field, encoder=matrix.endec)
-
             LOGGER.debug(f"Make share tensor")
-            # if isinstance(matrix, fixedpoint_numpy.FixedPointTensor):
-            #     xy = share_tensor.dot_array(matrix.value)
-            # else:
-            #     xy = share_tensor.dot_local(matrix)
-
-            # xy = matrix.dot_array(share)
             if isinstance(share, np.ndarray):
                 xy = matrix.dot_array(share, fit_intercept=self.fit_intercept)
             else:

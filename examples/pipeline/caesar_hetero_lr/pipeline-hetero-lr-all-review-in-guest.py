@@ -24,7 +24,6 @@ from pipeline.component.evaluation import Evaluation
 from pipeline.component.intersection import Intersection
 from pipeline.component.reader import Reader
 from pipeline.interface.data import Data
-from pipeline.interface.model import Model
 from pipeline.runtime.entity import JobParameters
 from pipeline.utils.tools import load_job_config
 
@@ -45,8 +44,8 @@ def main(config="../../config.yaml", namespace=""):
     guest = parties.guest[0]
     hosts = parties.host[0]
 
-    guest_train_data = {"name": "breast_hetero_guest", "namespace": f"experiment{namespace}"}
-    host_train_data = {"name": "breast_hetero_host", "namespace": f"experiment{namespace}"}
+    guest_train_data = {"name": "breast_hetero_guest_label_only", "namespace": f"experiment{namespace}"}
+    host_train_data = {"name": "breast_hetero_host_all_features", "namespace": f"experiment{namespace}"}
     # guest_train_data = {"name": "default_credit_hetero_guest", "namespace": f"experiment{namespace}"}
     # host_train_data = {"name": "default_credit_hetero_host", "namespace": f"experiment{namespace}"}
 
@@ -88,7 +87,7 @@ def main(config="../../config.yaml", namespace=""):
         "optimizer": "rmsprop",
         "tol": 0.0001,
         "alpha": 0.01,
-        "max_iter": 100,
+        "max_iter": 3,
         "early_stop": "diff",
         "batch_size": -1,
         "learning_rate": 0.15,
@@ -98,7 +97,8 @@ def main(config="../../config.yaml", namespace=""):
         },
         "encrypt_param": {
             "key_length": 1024
-        }
+        },
+        "review_strategy": "all_review_in_guest"
     }
 
     hetero_lr_0 = CaesarHeteroLR(**lr_param)
@@ -127,7 +127,6 @@ def main(config="../../config.yaml", namespace=""):
                                    data=Data(predict_input={pipeline.dataio_0.input.data: reader_0.output.data}))
     # run predict model
     predict_pipeline.predict(job_parameters)
-
     return pipeline
 
 

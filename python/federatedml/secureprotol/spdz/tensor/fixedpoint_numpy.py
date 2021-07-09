@@ -69,41 +69,6 @@ class FixedPointEndec(object):
             return integer_tensor // (self.base ** self.precision_fractional)
 
 
-class FixedPointObjectEndec(FixedPointEndec):
-
-    def encode(self, float_tensor, check_range=True):
-        return float_tensor
-
-    def decode(self, integer_tensor: np.ndarray):
-        return integer_tensor
-
-    # def encode(self, float_tensor, check_range=True):
-    #     if isinstance(float_tensor, (float, np.float)):
-    #         float_tensor = np.array(float_tensor)
-    #     if isinstance(float_tensor, np.ndarray):
-    #         upscaled = (float_tensor * self.base ** self.precision_fractional).astype(np.int64).astype(object)
-    #         if check_range:
-    #             assert (np.abs(upscaled) < (self.field / 2)).all(), (
-    #                 f"{float_tensor} cannot be correctly embedded: choose bigger field or a lower precision"
-    #             )
-    #
-    #         field_element = upscaled % self.field
-    #         return field_element
-    #     elif is_table(float_tensor):
-    #         s = self.base ** self.precision_fractional
-    #         upscaled = float_tensor.mapValues(lambda x: (x * s).astype(np.int64).astype(object))
-    #         if check_range:
-    #             assert upscaled.filter(lambda k, v: (np.abs(v) >= self.field / 2).any()).count() == 0, (
-    #                 f"{float_tensor} cannot be correctly embedded: choose bigger field or a lower precision"
-    #             )
-    #         field_element = upscaled.mapValues(lambda x: x % self.field)
-    #         return field_element
-    #     else:
-    #         raise ValueError(f"unsupported type: {type(float_tensor)}")
-
-
-
-
 class FixedPointTensor(TensorBase):
     __array_ufunc__ = None
 

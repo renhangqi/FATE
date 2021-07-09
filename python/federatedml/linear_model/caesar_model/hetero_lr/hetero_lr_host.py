@@ -19,6 +19,7 @@ from federatedml.linear_model.caesar_model.hetero_lr.hetero_lr_base import Heter
 from federatedml.secureprotol.spdz.tensor import fixedpoint_table, fixedpoint_numpy
 from federatedml.util import consts, LOGGER
 from federatedml.util import fate_operator
+from federatedml.protobuf.generated import lr_model_param_pb2
 import copy
 import numpy as np
 
@@ -88,17 +89,46 @@ class HeteroLRHost(HeteroLRBase):
         return wa, wb
 
     def check_converge(self, last_w, new_w, suffix):
+        if self.is_respectively_reviewed:
+            return self._respectively_check(last_w[0], new_w, suffix)
+        else:
+            return self._unbalanced_check(suffix)
+
+    def _respectively_check(self, last_w, new_w, suffix):
         square_sum = np.sum((last_w - new_w) ** 2)
         self.converge_transfer_variable.square_sum.remote(square_sum, role=consts.GUEST, idx=0, suffix=suffix)
         return self.converge_transfer_variable.converge_info.get(idx=0, suffix=suffix)
 
+    def _unbalanced_check(self, suffix):
+        return self.converge_transfer_variable.converge_info.get(idx=0, suffix=suffix)
+
     def predict(self, data_instances):
-        self.transfer_variable.host_prob.disable_auto_clean()
         LOGGER.info("Start predict ...")
         self._abnormal_detection(data_instances)
         data_instances = self.align_data_header(data_instances, self.header)
+        if self.model_param.review_strategy == "respectively":
+            self._respectively_predict(data_instances)
+        else:
+            self._unbalanced_predict(data_instances)
+
+    def _respectively_predict(self, data_instances):
+        self.transfer_variable.host_prob.disable_auto_clean()
         prob_host = data_instances.mapValues(lambda v: fate_operator.vec_dot(v.features, self.model_weights.coef_)
                                                        + self.model_weights.intercept_)
         # prob_host = self.compute_wx(data_instances, self.model_weights.coef_, self.model_weights.intercept_)
         self.transfer_variable.host_prob.remote(prob_host, role=consts.GUEST, idx=0)
         LOGGER.info("Remote probability to Guest")
+
+    def _unbalanced_predict(self, data_instances):
+        encrypted_host_weights = self.transfer_variable.encrypted_host_weights.get(idx=-1)[0]
+        prob_host = data_instances.mapValues(lambda v: fate_operator.vec_dot(v.features, encrypted_host_weights))
+        self.transfer_variable.host_prob.remote(prob_host, role=consts.GUEST, idx=0)
+        LOGGER.info("Remote probability to Guest")
+
+    def _get_param(self):
+        single_result = self.get_single_model_param()
+        single_result['need_one_vs_rest'] = False
+        param_protobuf_obj = lr_model_param_pb2.LRModelParam(**single_result)
+        return param_protobuf_obj
+
+
