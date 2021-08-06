@@ -10,23 +10,21 @@ from pulsar import _pulsar
 from fate_arch.common import log
 
 LOGGER = log.getLogger()
-CHANNEL_TYPE_PRODUCER = 'producer'
-CHANNEL_TYPE_CONSUMER = 'consumer'
-DEFAULT_TENANT = 'fl-tenant'
-DEFAULT_CLUSTER = 'standalone'
-TOPIC_PREFIX = '{}/{}/{}'
-UNIQUE_PRODUCER_NAME = 'unique_producer'
-UNIQUE_CONSUMER_NAME = 'unique_consumer'
-DEFAULT_SUBSCRIPTION_NAME = 'unique'
+CHANNEL_TYPE_PRODUCER = "producer"
+CHANNEL_TYPE_CONSUMER = "consumer"
+DEFAULT_TENANT = "fl-tenant"
+DEFAULT_CLUSTER = "standalone"
+TOPIC_PREFIX = "{}/{}/{}"
+UNIQUE_PRODUCER_NAME = "unique_producer"
+UNIQUE_CONSUMER_NAME = "unique_consumer"
+DEFAULT_SUBSCRIPTION_NAME = "unique"
 
 
 def connection_retry(func):
-    """retry connection
-    """
+    """retry connection"""
 
     def wrapper(self, *args, **kwargs):
-        """wrapper
-        """
+        """wrapper"""
         res = None
         for ntry in range(60):
             try:
@@ -36,14 +34,29 @@ def connection_retry(func):
                 LOGGER.debug(e)
                 time.sleep(3)
         return res
+
     return wrapper
 
- # A channel cloud only be able to send or receive message.
+
+# A channel cloud only be able to send or receive message.
 
 
 class MQChannel(object):
     # TODO add credential to secure pulsar cluster
-    def __init__(self, host, port, mng_port, pulsar_tenant, pulsar_namespace, pulsar_send_topic, pulsar_receive_topic, party_id, role, credential=None, extra_args: dict = None):
+    def __init__(
+        self,
+        host,
+        port,
+        mng_port,
+        pulsar_tenant,
+        pulsar_namespace,
+        pulsar_send_topic,
+        pulsar_receive_topic,
+        party_id,
+        role,
+        credential=None,
+        extra_args: dict = None,
+    ):
         # "host:port" is used to connect the pulsar broker
         self._host = host
         self._port = port
@@ -56,6 +69,8 @@ class MQChannel(object):
         self._party_id = party_id
         self._role = role
         self._extra_args = extra_args
+        # store confirmed messaged
+        self._confirmed = []
 
         # "_channel" is the subscriptor for the topic
         self._producer_send = None
@@ -68,12 +83,12 @@ class MQChannel(object):
         self._latest_confirmed = None
 
         self._producer_config = {}
-        if extra_args.get('producer') is not None:
-            self._producer_config.update(extra_args['producer'])
+        if extra_args.get("producer") is not None:
+            self._producer_config.update(extra_args["producer"])
 
         self._consumer_config = {}
-        if extra_args.get('consumer') is not None:
-            self._consumer_config.update(extra_args['consumer'])
+        if extra_args.get("consumer") is not None:
+            self._consumer_config.update(extra_args["consumer"])
 
     @property
     def party_id(self):
@@ -83,12 +98,10 @@ class MQChannel(object):
     @connection_retry
     def basic_publish(self, body, properties):
         self._get_or_create_producer()
-        LOGGER.debug('send queue: {}'.format(
-            self._producer_send.topic()))
-        LOGGER.debug('send data size: {}'.format(len(body)))
+        LOGGER.debug("send queue: {}".format(self._producer_send.topic()))
+        LOGGER.debug("send data size: {}".format(len(body)))
 
-        message_id = self._producer_send.send(
-            content=body, properties=properties)
+        message_id = self._producer_send.send(content=body, properties=properties)
         if message_id is None:
             raise Exception("publish failed")
 
@@ -98,8 +111,7 @@ class MQChannel(object):
     def consume(self):
         self._get_or_create_consumer()
 
-        LOGGER.debug('receive topic: {}'.format(
-            self._consumer_receive.topic()))
+        LOGGER.debug("receive topic: {}".format(self._consumer_receive.topic()))
 
         message = self._consumer_receive.receive()
 
@@ -111,21 +123,29 @@ class MQChannel(object):
         try:
             self._consumer_receive.acknowledge(message)
             self._latest_confirmed = message
+            self._confirmed.append(message)
         except:
             self._consumer_receive.negative_acknowledge(message)
+
+    @connection_retry
+    def unack_all(self):
+        self._get_or_create_consumer()
+        while len(self._confirmed) != 0:
+            self._consumer_receive.negative_acknowledger(self._confirmed[0])
+            self._confirmed = self._confirmed[1:]
 
     def cancel(self):
         if self._consumer_conn is not None:
             try:
                 self._consumer_conn.close()
             except Exception as e:
-                LOGGER.debug('meet {} when trying to close consumer'.format(e))
+                LOGGER.debug("meet {} when trying to close consumer".format(e))
 
         if self._producer_conn is not None:
             try:
                 self._producer_conn.close()
             except Exception as e:
-                LOGGER.debug('meet {} when trying to close producer'.format(e))
+                LOGGER.debug("meet {} when trying to close producer".format(e))
 
     @connection_retry
     def _get_or_create_producer(self):
@@ -133,21 +153,25 @@ class MQChannel(object):
             # if self._producer_conn is None:
             try:
                 self._producer_conn = pulsar.Client(
-                    service_url='pulsar://{}:{}'.format(
-                        self._host, self._port),
-                    operation_timeout_seconds=30)
+                    service_url="pulsar://{}:{}".format(self._host, self._port),
+                    operation_timeout_seconds=30,
+                )
             except Exception:
                 self._producer_conn = None
 
             # alway used current client to fetch producer
             try:
-                self._producer_send = self._producer_conn.create_producer(TOPIC_PREFIX.format(self._tenant, self._namespace, self._send_topic),
-                                                                          producer_name=UNIQUE_PRODUCER_NAME,
-                                                                          send_timeout_millis=500,
-                                                                          max_pending_messages=500,
-                                                                          compression_type=pulsar.CompressionType.LZ4,
-                                                                          # initial_sequence_id=self._sequence_id,
-                                                                          **self._producer_config)
+                self._producer_send = self._producer_conn.create_producer(
+                    TOPIC_PREFIX.format(
+                        self._tenant, self._namespace, self._send_topic
+                    ),
+                    producer_name=UNIQUE_PRODUCER_NAME,
+                    send_timeout_millis=500,
+                    max_pending_messages=500,
+                    compression_type=pulsar.CompressionType.LZ4,
+                    # initial_sequence_id=self._sequence_id,
+                    **self._producer_config
+                )
             except Exception:
                 self._producer_conn = None
 
@@ -157,19 +181,23 @@ class MQChannel(object):
             # if self._consumer_conn is None:
             try:
                 self._consumer_conn = pulsar.Client(
-                    service_url='pulsar://{}:{}'.format(
-                        self._host, self._port),
-                    operation_timeout_seconds=30)
+                    service_url="pulsar://{}:{}".format(self._host, self._port),
+                    operation_timeout_seconds=30,
+                )
             except Exception:
                 self._consumer_conn = None
 
             try:
-                self._consumer_receive = self._consumer_conn.subscribe(TOPIC_PREFIX.format(self._tenant, self._namespace, self._receive_topic),
-                                                                       subscription_name=DEFAULT_SUBSCRIPTION_NAME,
-                                                                       consumer_name=UNIQUE_CONSUMER_NAME,
-                                                                       initial_position=pulsar.InitialPosition.Earliest,
-                                                                       replicate_subscription_state_enabled=True,
-                                                                       **self._consumer_config)
+                self._consumer_receive = self._consumer_conn.subscribe(
+                    TOPIC_PREFIX.format(
+                        self._tenant, self._namespace, self._receive_topic
+                    ),
+                    subscription_name=DEFAULT_SUBSCRIPTION_NAME,
+                    consumer_name=UNIQUE_CONSUMER_NAME,
+                    initial_position=pulsar.InitialPosition.Earliest,
+                    replicate_subscription_state_enabled=True,
+                    **self._consumer_config
+                )
             except Exception:
                 self._consumer_conn = None
 
@@ -182,7 +210,7 @@ class MQChannel(object):
             self._producer_send.flush()
             return True
         except Exception as e:
-            LOGGER.debug('catch {}, closing producer client'.format(e))
+            LOGGER.debug("catch {}, closing producer client".format(e))
             if self._producer_conn is not None:
                 try:
                     self._producer_conn.close()
@@ -199,12 +227,11 @@ class MQChannel(object):
 
         try:
             self._consumer_conn.get_topic_partitions("test-alive")
-            #message = self._consumer_receive.receive(timeout_millis=3000)
-            self._consumer_receive.acknowledge(
-                self._latest_confirmed)
+            # message = self._consumer_receive.receive(timeout_millis=3000)
+            self._consumer_receive.acknowledge(self._latest_confirmed)
             return True
         except Exception as e:
-            LOGGER.debug('catch {}, closing consumer client'.format(e))
+            LOGGER.debug("catch {}, closing consumer client".format(e))
             if self._consumer_conn is not None:
                 try:
                     self._consumer_conn.close()
