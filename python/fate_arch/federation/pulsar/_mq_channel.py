@@ -131,6 +131,7 @@ class MQChannel(object):
     def unack_all(self):
         self._get_or_create_consumer()
         while len(self._confirmed) != 0:
+            # unack received earilier
             self._consumer_receive.negative_acknowledger(self._confirmed[0])
             self._confirmed = self._confirmed[1:]
 

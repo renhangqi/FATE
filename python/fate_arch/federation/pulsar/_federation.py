@@ -8,6 +8,7 @@ import json
 import sys
 import time
 import typing
+import random
 from pickle import dumps as p_dumps, loads as p_loads
 
 import pulsar
@@ -719,7 +720,7 @@ class Federation(FederationABC):
                 "correlation_id": tag,
                 "headers": headers,
             }
-            print(f"[pulsar._send_kv]info: {info}, properties: {properties}.")
+            LOGGER.debug(f"[pulsar._send_kv]info: {info}, properties: {properties}.")
             info.basic_publish(body=data, properties=properties)
 
     def _get_partition_send_func(
@@ -776,7 +777,7 @@ class Federation(FederationABC):
                 datastream.get_size() + sys.getsizeof(el["k"]) + sys.getsizeof(el["v"])
                 >= maximun_message_size
             ):
-                print(
+                LOGGER.debug(
                     f"[pulsar._partition_send]The size of message is: {datastream.get_size()}"
                 )
                 message_key_idx += 1
@@ -828,20 +829,20 @@ class Federation(FederationABC):
         count = 0
         partition_size = -1
         all_data = []
-        try:
-            while True:
+        while True:
+            try:
                 message = channel_info.consume()
                 properties = message.properties()
                 # must get bytes
                 body = message.data().decode()
-                print(f"[pulsar._partition_receive] properties: {properties}.")
+                LOGGER.debug(f"[pulsar._partition_receive] properties: {properties}.")
                 if (
                     properties["message_id"] != name
                     or properties["correlation_id"] != tag
                 ):
                     # leave this code to handle unexpected situation
                     channel_info.basic_ack(message)
-                    print(
+                    LOGGER.debug(
                         f"[pulsar._partition_receive]: require {name}.{tag}, got {properties['message_id']}.{properties['correlation_id']}"
                     )
                     continue
@@ -874,7 +875,6 @@ class Federation(FederationABC):
                     LOGGER.debug(f"[pulsar._partition_receive] count: {count}")
                     all_data.extend(data_iter)
                     channel_info.basic_ack(message)
-
                     if count == partition_size:
                         channel_info.cancel()
                         return all_data
@@ -882,11 +882,14 @@ class Federation(FederationABC):
                     raise ValueError(
                         f"[pulsar._partition_receive]properties.content_type is {properties.content_type}, but must be application/json"
                     )
-        except Exception as e:
-            LOGGER.debug(
-                f"[pulsar._partition_receive]catch exception {e}, will unack all received messages"
-            )
-            self.channel_info.unack_all()
+            except Exception as e:
+                LOGGER.error(
+                    f"[pulsar._partition_receive]catch exception {e}, while receiving {name}.{tag}"
+                )
+                # avoid hang on consume()
+                if count == partition_size:
+                    channel_info.cancel()
+                    return all_data
 
     def _unsubscribe_topic(self, topic_name):
         self._pulsar_manager.unsubscribe_topic(
