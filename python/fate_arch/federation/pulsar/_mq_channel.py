@@ -238,11 +238,11 @@ class MQChannel(object):
             # self._consumer_conn.get_topic_partitions("test-alive")
             # message = self._consumer_receive.receive(timeout_millis=3000)
             # self._consumer_receive.redeliver_unacknowledged_messages()
+            # have not confirmed any message yet
             if self._latest_confirmed is not None:
                 self._consumer_receive.acknowledge(self._latest_confirmed)
             else:
-                self._consumer_conn.get_topic_partitions("test-alive")
-            return True
+                return False
         except Exception as e:
             LOGGER.debug("catch {}, closing consumer client".format(e))
             if self._consumer_conn is not None:
