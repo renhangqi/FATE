@@ -208,6 +208,7 @@ class MQChannel(object):
 
             except Exception as e:
                 LOGGER.debug(f"catch exception {e} in creating pulsar consumer")
+                self._consumer_conn.close()
                 self._consumer_conn = None
 
     def _check_producer_alive(self):
@@ -235,12 +236,9 @@ class MQChannel(object):
             return False
 
         try:
-            # self._consumer_conn.get_topic_partitions("test-alive")
-            # message = self._consumer_receive.receive(timeout_millis=3000)
-            # self._consumer_receive.redeliver_unacknowledged_messages()
-            # have not confirmed any message yet
             if self._latest_confirmed is not None:
                 self._consumer_receive.acknowledge(self._latest_confirmed)
+                return True
             else:
                 return False
         except Exception as e:
