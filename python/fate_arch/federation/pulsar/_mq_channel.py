@@ -157,7 +157,7 @@ class MQChannel(object):
                     service_url="pulsar://{}:{}".format(self._host, self._port),
                     operation_timeout_seconds=30,
                 )
-            except Exception:
+            except Exception as e:
                 self._producer_conn = None
 
             # alway used current client to fetch producer
@@ -167,13 +167,14 @@ class MQChannel(object):
                         self._tenant, self._namespace, self._send_topic
                     ),
                     producer_name=UNIQUE_PRODUCER_NAME,
-                    send_timeout_millis=500,
+                    send_timeout_millis=60000,
                     max_pending_messages=500,
                     compression_type=pulsar.CompressionType.LZ4,
                     # initial_sequence_id=self._sequence_id,
                     **self._producer_config
                 )
-            except Exception:
+            except Exception as e:
+                LOGGER.debug(f"catch exception {e} in creating pulsar producer")
                 self._producer_conn = None
 
     @connection_retry
@@ -199,7 +200,8 @@ class MQChannel(object):
                     replicate_subscription_state_enabled=True,
                     **self._consumer_config
                 )
-            except Exception:
+            except Exception as e:
+                LOGGER.debug(f"catch exception {e} in creating pulsar consumer")
                 self._consumer_conn = None
 
     def _check_producer_alive(self):
