@@ -780,6 +780,8 @@ class Federation(FederationABC):
             ):
                 LOGGER.debug(
                     f"[pulsar._partition_send]The count of message is: {internal_count}"
+                )
+                LOGGER.debug(
                     f"[pulsar._partition_send]The total count of message is: {count}"
                 )
                 internal_count = 0
@@ -884,7 +886,9 @@ class Federation(FederationABC):
                             channel_info.cancel()
                             return all_data
                         else:
-                            raise Exception(f"[pulsar._partition_receive] want {partition_size} data in {name}.{tag} but got {count}")
+                            raise Exception(
+                                f"[pulsar._partition_receive] want {partition_size} data in {name}.{tag} but got {count}"
+                            )
                 else:
                     raise ValueError(
                         f"[pulsar._partition_receive]properties.content_type is {properties.content_type}, but must be application/json"
