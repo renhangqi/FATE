@@ -780,6 +780,7 @@ class Federation(FederationABC):
             ):
                 LOGGER.debug(
                     f"[pulsar._partition_send]The count of message is: {internal_count}"
+                    f"[pulsar._partition_send]The total count of message is: {count}"
                 )
                 internal_count = 0
                 message_key_idx += 1
@@ -875,6 +876,7 @@ class Federation(FederationABC):
                     )
                     count += len(data)
                     LOGGER.debug(f"[pulsar._partition_receive] count: {len(data)}")
+                    LOGGER.debug(f"[pulsar._partition_receive]total count: {count}")
                     all_data.extend(data_iter)
                     channel_info.basic_ack(message)
                     if partition_size != -1:

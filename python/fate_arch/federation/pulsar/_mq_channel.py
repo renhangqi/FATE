@@ -231,7 +231,8 @@ class MQChannel(object):
         try:
             self._consumer_conn.get_topic_partitions("test-alive")
             # message = self._consumer_receive.receive(timeout_millis=3000)
-            self._consumer_receive.acknowledge(self._latest_confirmed)
+            self._consumer_receive.redeliver_unacknowledged_messages()
+            # self._consumer_receive.acknowledge(self._latest_confirmed)
             return True
         except Exception as e:
             LOGGER.debug("catch {}, closing consumer client".format(e))
