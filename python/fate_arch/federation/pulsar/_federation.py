@@ -781,7 +781,7 @@ class Federation(FederationABC):
                 >= maximun_message_size
             ):
                 LOGGER.debug(
-                    f"[pulsar._partition_send]The count of message is: internal_count}"
+                    f"[pulsar._partition_send]The count of message is: {internal_count}]"
                 )
                 internal_count = 0
                 message_key_idx += 1
