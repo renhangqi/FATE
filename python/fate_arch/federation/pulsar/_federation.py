@@ -94,10 +94,12 @@ class Federation(FederationABC):
         tenant = pulsar_config.get("tenant", DEFAULT_TENANT)
 
         # pulsaar runtime config
-        pulsar_run = runtime_conf.get("job_parameters", {}).get("pulsar_run", {})
+        pulsar_run = runtime_conf.get(
+            "job_parameters", {}).get("pulsar_run", {})
         LOGGER.debug(f"pulsar_run: {pulsar_run}")
 
-        max_message_size = pulsar_run.get("max_message_size", DEFAULT_MESSAGE_MAX_SIZE)
+        max_message_size = pulsar_run.get(
+            "max_message_size", DEFAULT_MESSAGE_MAX_SIZE)
         LOGGER.debug(f"set max message size to {max_message_size} Bytes")
 
         # topic ttl could be overwritten by run time config
@@ -115,7 +117,8 @@ class Federation(FederationABC):
         # init tenant
         tenant_info = pulsar_manager.get_tenant(tenant=tenant).json()
         if tenant_info.get("allowedClusters") is None:
-            pulsar_manager.create_tenant(tenant=tenant, admins=[], clusters=[cluster])
+            pulsar_manager.create_tenant(
+                tenant=tenant, admins=[], clusters=[cluster])
 
         route_table_path = pulsar_config.get("route_table")
         if route_table_path is None:
@@ -177,7 +180,8 @@ class Federation(FederationABC):
             party_topic_infos = self._get_party_topic_infos(
                 parties, dtype=NAME_DTYPE_TAG
             )
-            channel_infos = self._get_channels(party_topic_infos=party_topic_infos)
+            channel_infos = self._get_channels(
+                party_topic_infos=party_topic_infos)
             rtn_dtype = []
             for i, info in enumerate(channel_infos):
                 obj = self._receive_obj(
@@ -232,7 +236,8 @@ class Federation(FederationABC):
                 )
         else:
             party_topic_infos = self._get_party_topic_infos(parties, name)
-            channel_infos = self._get_channels(party_topic_infos=party_topic_infos)
+            channel_infos = self._get_channels(
+                party_topic_infos=party_topic_infos)
             for i, info in enumerate(channel_infos):
                 obj = self._receive_obj(info, name, tag)
                 LOGGER.debug(
@@ -264,9 +269,11 @@ class Federation(FederationABC):
             party_topic_infos = self._get_party_topic_infos(
                 parties, dtype=NAME_DTYPE_TAG
             )
-            channel_infos = self._get_channels(party_topic_infos=party_topic_infos)
+            channel_infos = self._get_channels(
+                party_topic_infos=party_topic_infos)
             if isinstance(v, Table):
-                body = {"dtype": FederationDataType.TABLE, "partitions": v.partitions}
+                body = {"dtype": FederationDataType.TABLE,
+                        "partitions": v.partitions}
             else:
                 body = {"dtype": FederationDataType.OBJECT}
 
@@ -311,7 +318,8 @@ class Federation(FederationABC):
         else:
             LOGGER.debug(f"[{log_str}]start to remote obj")
             party_topic_infos = self._get_party_topic_infos(parties, name)
-            channel_infos = self._get_channels(party_topic_infos=party_topic_infos)
+            channel_infos = self._get_channels(
+                party_topic_infos=party_topic_infos)
             self._send_obj(
                 name=name, tag=tag, data=p_dumps(v), channel_infos=channel_infos
             )
@@ -376,12 +384,14 @@ class Federation(FederationABC):
         topic_infos = []
 
         if dtype is not None:
-            topic_key = _SPLIT_.join([party.role, party.party_id, dtype, dtype])
+            topic_key = _SPLIT_.join(
+                [party.role, party.party_id, dtype, dtype])
             topic_key_list.append(topic_key)
         else:
             if partitions is not None:
                 for i in range(partitions):
-                    topic_key = _SPLIT_.join([party.role, party.party_id, name, str(i)])
+                    topic_key = _SPLIT_.join(
+                        [party.role, party.party_id, name, str(i)])
                     topic_key_list.append(topic_key)
             elif name is not None:
                 topic_key = _SPLIT_.join([party.role, party.party_id, name])
@@ -416,7 +426,8 @@ class Federation(FederationABC):
                     )
                 else:
                     # init pulsar cluster
-                    cluster = self._pulsar_manager.get_cluster(party.party_id).json()
+                    cluster = self._pulsar_manager.get_cluster(
+                        party.party_id).json()
                     if (
                         cluster.get("brokerServiceUrl", "") == ""
                         and cluster.get("brokerServiceUrlTls", "") == ""
@@ -432,7 +443,8 @@ class Federation(FederationABC):
 
                         # handle party does not exist in route table first
                         if remote_party is None:
-                            domain = self._mq.route_table.get("default").get("domain")
+                            domain = self._mq.route_table.get(
+                                "default").get("domain")
                             host = f"{party.party_id}.{domain}"
                             port = self._mq.route_table.get("default").get(
                                 "brokerPort", "6650"
@@ -440,7 +452,8 @@ class Federation(FederationABC):
                             sslPort = self._mq.route_table.get("default").get(
                                 "brokerSslPort", "6651"
                             )
-                            proxy = self._mq.route_table.get("default").get("proxy", "")
+                            proxy = self._mq.route_table.get(
+                                "default").get("proxy", "")
                         # fetch party info from the route table
                         else:
                             host = self._mq.route_table.get(int(party.party_id)).get(
@@ -494,7 +507,8 @@ class Federation(FederationABC):
                             raise Exception(error_message)
 
                     # update tenant
-                    tenant_info = self._pulsar_manager.get_tenant(self._tenant).json()
+                    tenant_info = self._pulsar_manager.get_tenant(
+                        self._tenant).json()
                     if party.party_id not in tenant_info["allowedClusters"]:
                         tenant_info["allowedClusters"].append(party.party_id)
                         if self._pulsar_manager.update_tenant(
@@ -513,7 +527,8 @@ class Federation(FederationABC):
 
                 # TODO: remove this for the loop
                 # init pulsar namespace
-                namespaces = self._pulsar_manager.get_namespace(self._tenant).json()
+                namespaces = self._pulsar_manager.get_namespace(
+                    self._tenant).json()
                 # create namespace
                 if f"{self._tenant}/{self._session_id}" not in namespaces:
                     # append target cluster to the pulsar namespace
@@ -720,7 +735,8 @@ class Federation(FederationABC):
                 "correlation_id": tag,
                 "headers": headers,
             }
-            LOGGER.debug(f"[pulsar._send_kv]info: {info}, properties: {properties}.")
+            LOGGER.debug(
+                f"[pulsar._send_kv]info: {info}, properties: {properties}.")
             info.basic_publish(body=data, properties=properties)
 
     def _get_partition_send_func(
@@ -775,7 +791,8 @@ class Federation(FederationABC):
             el = {"k": p_dumps(k).hex(), "v": p_dumps(v).hex()}
             # roughly caculate the size of package to avoid serialization ;)
             if (
-                datastream.get_size() + sys.getsizeof(el["k"]) + sys.getsizeof(el["v"])
+                datastream.get_size() +
+                sys.getsizeof(el["k"]) + sys.getsizeof(el["v"])
                 >= maximun_message_size
             ):
                 LOGGER.debug(
@@ -786,7 +803,8 @@ class Federation(FederationABC):
                 )
                 internal_count = 0
                 message_key_idx += 1
-                message_key = _SPLIT_.join([base_message_key, str(message_key_idx)])
+                message_key = _SPLIT_.join(
+                    [base_message_key, str(message_key_idx)])
                 self._send_kv(
                     name=name,
                     tag=tag,
@@ -840,7 +858,8 @@ class Federation(FederationABC):
                 properties = message.properties()
                 # must get bytes
                 body = message.data().decode()
-                LOGGER.debug(f"[pulsar._partition_receive] properties: {properties}.")
+                LOGGER.debug(
+                    f"[pulsar._partition_receive] properties: {properties}.")
                 if (
                     properties["message_id"] != name
                     or properties["correlation_id"] != tag
@@ -877,8 +896,10 @@ class Federation(FederationABC):
                         for el in data
                     )
                     count += len(data)
-                    LOGGER.debug(f"[pulsar._partition_receive] count: {len(data)}")
-                    LOGGER.debug(f"[pulsar._partition_receive]total count: {count}")
+                    LOGGER.debug(
+                        f"[pulsar._partition_receive] count: {len(data)}")
+                    LOGGER.debug(
+                        f"[pulsar._partition_receive]total count: {count}")
                     all_data.extend(data_iter)
                     channel_info.basic_ack(message)
                     if partition_size != -1:
@@ -921,7 +942,8 @@ class Federation(FederationABC):
     # this is used inside spark, which is required to create pulsar manager first
     # the mq_channel is a MQChannel instance
     def _unsubscribe_topic_without_manager(self, mq_channel):
-        pulsar_manager = PulsarManager(host=mq_channel._host, port=mq_channel._mng_port)
+        pulsar_manager = PulsarManager(
+            host=mq_channel._host, port=mq_channel._mng_port)
         pulsar_manager.unsubscribe_topic(
             mq_channel._tenant,
             mq_channel._namespace,

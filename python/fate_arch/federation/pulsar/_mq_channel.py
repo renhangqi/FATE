@@ -102,7 +102,8 @@ class MQChannel(object):
         LOGGER.debug("send queue: {}".format(self._producer_send.topic()))
         LOGGER.debug("send data size: {}".format(len(body)))
 
-        message_id = self._producer_send.send(content=body, properties=properties)
+        message_id = self._producer_send.send(
+            content=body, properties=properties)
         if message_id is None:
             raise Exception("publish failed")
 
@@ -112,7 +113,8 @@ class MQChannel(object):
     def consume(self):
         self._get_or_create_consumer()
 
-        LOGGER.debug("receive topic: {}".format(self._consumer_receive.topic()))
+        LOGGER.debug("receive topic: {}".format(
+            self._consumer_receive.topic()))
 
         message = self._consumer_receive.receive()
 
@@ -128,7 +130,7 @@ class MQChannel(object):
             self._consumer_receive.acknowledge(message)
             self._latest_confirmed = message
             self._confirmed.append(message)
-        except:
+        except Exception:
             self._consumer_receive.negative_acknowledge(message)
 
     @connection_retry
@@ -155,7 +157,8 @@ class MQChannel(object):
             # if self._producer_conn is None:
             try:
                 self._producer_conn = pulsar.Client(
-                    service_url="pulsar://{}:{}".format(self._host, self._port),
+                    service_url="pulsar://{}:{}".format(
+                        self._host, self._port),
                     operation_timeout_seconds=30,
                 )
             except Exception as e:
@@ -171,11 +174,11 @@ class MQChannel(object):
                     send_timeout_millis=60000,
                     max_pending_messages=500,
                     compression_type=pulsar.CompressionType.LZ4,
-                    # initial_sequence_id=self._sequence_id,
                     **self._producer_config,
                 )
             except Exception as e:
-                LOGGER.debug(f"catch exception {e} in creating pulsar producer")
+                LOGGER.debug(
+                    f"catch exception {e} in creating pulsar producer")
                 self._producer_conn = None
 
     @connection_retry
@@ -184,7 +187,8 @@ class MQChannel(object):
             # if self._consumer_conn is None:
             try:
                 self._consumer_conn = pulsar.Client(
-                    service_url="pulsar://{}:{}".format(self._host, self._port),
+                    service_url="pulsar://{}:{}".format(
+                        self._host, self._port),
                     operation_timeout_seconds=30,
                 )
             except Exception:
@@ -207,7 +211,8 @@ class MQChannel(object):
                     self._consumer_receive.seek(self._latest_confirmed)
 
             except Exception as e:
-                LOGGER.debug(f"catch exception {e} in creating pulsar consumer")
+                LOGGER.debug(
+                    f"catch exception {e} in creating pulsar consumer")
                 self._consumer_conn.close()
                 self._consumer_conn = None
 
