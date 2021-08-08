@@ -81,6 +81,7 @@ class MQChannel(object):
 
         self._sequence_id = None
         self._latest_confirmed = None
+        self._first_confirmed = None
 
         self._producer_config = {}
         if extra_args.get("producer") is not None:
@@ -115,6 +116,9 @@ class MQChannel(object):
 
         message = self._consumer_receive.receive()
 
+        if self._first_confirmed is None:
+            self._first_confirmed = message
+
         return message
 
     @connection_retry
@@ -130,10 +134,7 @@ class MQChannel(object):
     @connection_retry
     def unack_all(self):
         self._get_or_create_consumer()
-        while len(self._confirmed) != 0:
-            # unack received earilier
-            self._consumer_receive.negative_acknowledger(self._confirmed[0])
-            self._confirmed = self._confirmed[1:]
+        self._consumer_receive.seek(self._first_confirmed)
 
     def cancel(self):
         if self._consumer_conn is not None:
@@ -171,7 +172,7 @@ class MQChannel(object):
                     max_pending_messages=500,
                     compression_type=pulsar.CompressionType.LZ4,
                     # initial_sequence_id=self._sequence_id,
-                    **self._producer_config
+                    **self._producer_config,
                 )
             except Exception as e:
                 LOGGER.debug(f"catch exception {e} in creating pulsar producer")
@@ -198,8 +199,13 @@ class MQChannel(object):
                     consumer_name=UNIQUE_CONSUMER_NAME,
                     initial_position=pulsar.InitialPosition.Earliest,
                     replicate_subscription_state_enabled=True,
-                    **self._consumer_config
+                    **self._consumer_config,
                 )
+
+                # set cursor to latest confirmed
+                if self._latest_confirmed is not None:
+                    self._consumer_receive.seek(self._latest_confirmed)
+
             except Exception as e:
                 LOGGER.debug(f"catch exception {e} in creating pulsar consumer")
                 self._consumer_conn = None
@@ -229,10 +235,10 @@ class MQChannel(object):
             return False
 
         try:
-            self._consumer_conn.get_topic_partitions("test-alive")
+            # self._consumer_conn.get_topic_partitions("test-alive")
             # message = self._consumer_receive.receive(timeout_millis=3000)
-            self._consumer_receive.redeliver_unacknowledged_messages()
-            # self._consumer_receive.acknowledge(self._latest_confirmed)
+            # self._consumer_receive.redeliver_unacknowledged_messages()
+            self._consumer_receive.acknowledge(self._latest_confirmed)
             return True
         except Exception as e:
             LOGGER.debug("catch {}, closing consumer client".format(e))
