@@ -768,9 +768,7 @@ class Federation(FederationABC):
         base_message_key = str(index)
         message_key_idx = 0
         count = 0
-
         internal_count = 0
-
         for k, v in kvs:
             count += 1
             internal_count += 1
@@ -781,7 +779,7 @@ class Federation(FederationABC):
                 >= maximun_message_size
             ):
                 LOGGER.debug(
-                    f"[pulsar._partition_send]The count of message is: {internal_count}]"
+                    f"[pulsar._partition_send]The count of message is: {internal_count}"
                 )
                 internal_count = 0
                 message_key_idx += 1
@@ -876,7 +874,7 @@ class Federation(FederationABC):
                         for el in data
                     )
                     count += len(data)
-                    LOGGER.debug(f"[pulsar._partition_receive] count: {count}")
+                    LOGGER.debug(f"[pulsar._partition_receive] count: {len(data)}")
                     all_data.extend(data_iter)
                     channel_info.basic_ack(message)
                     if partition_size != -1:
@@ -897,6 +895,8 @@ class Federation(FederationABC):
                 if count == partition_size:
                     channel_info.cancel()
                     return all_data
+                else:
+                    raise e
 
     def _unsubscribe_topic(self, topic_name):
         self._pulsar_manager.unsubscribe_topic(
