@@ -769,8 +769,11 @@ class Federation(FederationABC):
         message_key_idx = 0
         count = 0
 
+        internal_count = 0
+
         for k, v in kvs:
             count += 1
+            internal_count += 1
             el = {"k": p_dumps(k).hex(), "v": p_dumps(v).hex()}
             # roughly caculate the size of package to avoid serialization ;)
             if (
@@ -778,8 +781,9 @@ class Federation(FederationABC):
                 >= maximun_message_size
             ):
                 LOGGER.debug(
-                    f"[pulsar._partition_send]The size of message is: {datastream.get_size()}"
+                    f"[pulsar._partition_send]The count of message is: internal_count}"
                 )
+                internal_count = 0
                 message_key_idx += 1
                 message_key = _SPLIT_.join([base_message_key, str(message_key_idx)])
                 self._send_kv(
@@ -875,9 +879,12 @@ class Federation(FederationABC):
                     LOGGER.debug(f"[pulsar._partition_receive] count: {count}")
                     all_data.extend(data_iter)
                     channel_info.basic_ack(message)
-                    if count == partition_size:
-                        channel_info.cancel()
-                        return all_data
+                    if partition_size != -1:
+                        if count == partition_size:
+                            channel_info.cancel()
+                            return all_data
+                        else:
+                            raise Exception(f"[pulsar._partition_receive] want {partition_size} data in {name}.{tag} but got {count}")
                 else:
                     raise ValueError(
                         f"[pulsar._partition_receive]properties.content_type is {properties.content_type}, but must be application/json"
