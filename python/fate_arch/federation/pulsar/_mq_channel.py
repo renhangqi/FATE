@@ -69,8 +69,6 @@ class MQChannel(object):
         self._party_id = party_id
         self._role = role
         self._extra_args = extra_args
-        # store confirmed messaged
-        self._confirmed = []
 
         # "_channel" is the subscriptor for the topic
         self._producer_send = None
@@ -115,12 +113,7 @@ class MQChannel(object):
 
         LOGGER.debug("receive topic: {}".format(
             self._consumer_receive.topic()))
-
         message = self._consumer_receive.receive()
-
-        if self._first_confirmed is None:
-            self._first_confirmed = message
-
         return message
 
     @connection_retry
@@ -129,7 +122,9 @@ class MQChannel(object):
         try:
             self._consumer_receive.acknowledge(message)
             self._latest_confirmed = message
-            self._confirmed.append(message)
+
+            if self._first_confirmed is None:
+                self._first_confirmed = message
         except Exception:
             self._consumer_receive.negative_acknowledge(message)
 
