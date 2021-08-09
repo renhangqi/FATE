@@ -82,6 +82,7 @@ if __name__ == '__main__':
             '/{}/pipeline'.format(API_VERSION): pipeline_app_manager,
             '/{}/permission'.format(API_VERSION): permission_app_manager,
             '/{}/version'.format(API_VERSION): version_app_manager,
+            '/{}/service'.format(API_VERSION): version_app_manager,
             '/{}/party'.format(API_VERSION): party_app_manager,
             '/{}/initiator'.format(API_VERSION): initiator_app_manager,
             '/{}/tracker'.format(API_VERSION): tracker_app_manager,
