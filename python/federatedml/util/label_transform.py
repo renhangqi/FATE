@@ -134,23 +134,37 @@ class LabelTransformer(ModelBase):
         return new_instance
 
     @staticmethod
-    def replace_predict_label(predict_result, label_encoder):
-        true_label, predict_label, predict_score, predict_detail, result_type = copy.deepcopy(predict_result)
+    def replace_predict_label(predict_inst, label_encoder):
+        transform_predict_inst = copy.deepcopy(predict_inst)
+        true_label, predict_label, predict_score, predict_detail, result_type = transform_predict_inst.features
         true_label, predict_label = label_encoder[true_label], label_encoder[predict_label]
         label_encoder_detail = {str(k): v for k, v in label_encoder.items()}
         predict_detail = {label_encoder_detail[label]: score for label, score in predict_detail.items()}
-        return [true_label, predict_label, predict_score, predict_detail, result_type]
+        transform_predict_inst.features = [true_label, predict_label, predict_score, predict_detail, result_type]
+        return transform_predict_inst
+
+    @staticmethod
+    def replace_predict_label_cluster(predict_inst, label_encoder):
+        transform_predict_inst = copy.deepcopy(predict_inst)
+        true_label, predict_label = transform_predict_inst.features[0], transform_predict_inst.features[1]
+        true_label, predict_label = label_encoder[true_label], label_encoder[predict_label]
+        transform_predict_inst.features = [true_label, predict_label]
+        return transform_predict_inst
 
     @staticmethod
     def transform_data_label(data, label_encoder):
-        if isinstance(data.first()[1], Instance):
+        data_type = data.schema.get("content_type")
+        if data_type == "regression_result":
+            LOGGER.info(f"Regression prediction result provided. Original data returned.")
+            return data
+        elif data_type == "instance":
             return data.mapValues(lambda v: LabelTransformer.replace_instance_label(v, label_encoder))
-        else:
-            predict_detail = data.first()[1][3]
-            if len(predict_detail) == 1 and list(predict_detail.keys())[0] == "label":
-                LOGGER.info(f"Regression prediction result provided. Original data returned.")
-                return data
+        elif data_type == "cluster_result":
+            return data.mapValues(lambda v: LabelTransformer.replace_predict_label_cluster(v, label_encoder))
+        elif data_type == "category_result":
             return data.mapValues(lambda v: LabelTransformer.replace_predict_label(v, label_encoder))
+        else:
+            raise ValueError(f"unknown data type: {data_type} encountered. Label transform aborted.")
 
     def transform(self, data):
         LOGGER.info(f"Enter Label Transformer Transform")
@@ -158,8 +172,9 @@ class LabelTransformer(ModelBase):
             raise ValueError(f"Input Label Encoder is None. Label Transform aborted.")
 
         label_encoder = self.label_encoder
+        data_type = data.schema.get("content_type")
         # revert label encoding if predict result
-        if not isinstance(data.first()[1], Instance):
+        if data_type != "instance":
             label_encoder = dict(zip(self.label_encoder.values(), self.label_encoder.keys()))
 
         result_data = LabelTransformer.transform_data_label(data, label_encoder)
