@@ -203,10 +203,10 @@ def get_label_count(data_instances):
 
 
 def get_predict_result_labels(data):
-    def _get_labels(score_results):
+    def _get_labels(score_inst):
         labels = set()
-        for idx, result in score_results:
-            label = result[0]
+        for idx, result in score_inst:
+            label = result.features[0]
             labels.add(label)
         return labels
 

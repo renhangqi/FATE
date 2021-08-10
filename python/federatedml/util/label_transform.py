@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 #
-#  Copyright 2019 The FATE Authors. All Rights Reserved.
+#  Copyright 2021 The FATE Authors. All Rights Reserved.
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -20,12 +20,11 @@ import copy
 import numpy as np
 
 from fate_flow.entity.metric import Metric, MetricMeta
-from federatedml.feature.instance import Instance
 from federatedml.model_base import ModelBase
 from federatedml.param.label_transform_param import LabelTransformParam
 from federatedml.protobuf.generated import label_transform_meta_pb2, label_transform_param_pb2
 from federatedml.statistic.data_overview import get_label_count, get_predict_result_labels
-from federatedml.util import consts, LOGGER
+from federatedml.util import LOGGER
 
 
 class LabelTransformer(ModelBase):
@@ -57,7 +56,8 @@ class LabelTransformer(ModelBase):
                 self.encoder_key_type = {str(v): type(v).__name__ for v in self.label_list}
 
         else:
-            if isinstance(data.first()[1], Instance):
+            data_type = data.schema.get("content_type")
+            if data_type is None:
                 label_count = get_label_count(data)
                 labels = sorted(label_count.keys())
             # predict result
@@ -154,15 +154,16 @@ class LabelTransformer(ModelBase):
     @staticmethod
     def transform_data_label(data, label_encoder):
         data_type = data.schema.get("content_type")
-        if data_type == "regression_result":
-            LOGGER.info(f"Regression prediction result provided. Original data returned.")
-            return data
-        elif data_type == "instance":
-            return data.mapValues(lambda v: LabelTransformer.replace_instance_label(v, label_encoder))
-        elif data_type == "cluster_result":
+        if data_type == "cluster_result":
             return data.mapValues(lambda v: LabelTransformer.replace_predict_label_cluster(v, label_encoder))
-        elif data_type == "category_result":
+        elif data_type == "predict_result":
+            predict_detail = data.first()[1].features[3]
+            if predict_detail == 1 and list(predict_detail.keys())[0] == "label":
+                LOGGER.info(f"Regression prediction result provided. Original data returned.")
+                return data
             return data.mapValues(lambda v: LabelTransformer.replace_predict_label(v, label_encoder))
+        elif data_type is None:
+            return data.mapValues(lambda v: LabelTransformer.replace_instance_label(v, label_encoder))
         else:
             raise ValueError(f"unknown data type: {data_type} encountered. Label transform aborted.")
 
@@ -174,7 +175,7 @@ class LabelTransformer(ModelBase):
         label_encoder = self.label_encoder
         data_type = data.schema.get("content_type")
         # revert label encoding if predict result
-        if data_type != "instance":
+        if data_type is not None:
             label_encoder = dict(zip(self.label_encoder.values(), self.label_encoder.keys()))
 
         result_data = LabelTransformer.transform_data_label(data, label_encoder)
