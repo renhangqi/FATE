@@ -1,0 +1,255 @@
+{
+    "title": "IntersectParam",
+    "description": "intersect param",
+    "type": "object",
+    "properties": {
+        "intersect_method": {
+            "type": "string",
+            "default": "raw",
+            "pattern": "(?i)^raw$|^rsa$|^dh$"
+        },
+        "random_bit": {
+            "type": "integer",
+            "default": 128,
+            "exclusiveMinimum": 0
+        },
+        "sync_intersect_ids": {
+            "type": "boolean",
+            "default": true
+        },
+        "join_role": {
+            "$ref": "#/$defs/role_default_guest"
+        },
+        "only_output_key": {
+            "type": "boolean",
+            "default": false
+        },
+        "with_encode": {
+            "type": "boolean",
+            "default": false
+        },
+        "encode_params": {
+            "type": "object",
+            "properties": {
+                "salt": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "base64": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "encode_method": {
+                    "$ref": "#/$defs/available_hash_method"
+                }
+            },
+            "required": [
+                "encode_method"
+            ],
+            "additionalProperties": false
+        },
+        "raw_params": {
+            "type": "object",
+            "properties": {
+                "use_hash": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "salt": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "base64": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "hash_method": {
+                    "$ref": "#/$defs/available_hash_method"
+                },
+                "join_role": {
+                    "$ref": "#/$defs/role_default_guest"
+                }
+            },
+            "required": [
+                "use_hash"
+            ],
+            "additionalProperties": false
+        },
+        "rsa_params": {
+            "type": "object",
+            "properties": {
+                "salt": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "hash_method": {
+                    "$ref": "#/$defs/strict_hash_method"
+                },
+                "final_hash_method": {
+                    "$ref": "#/$defs/available_hash_method"
+                },
+                "split_calculation": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "random_base_fraction": {
+                    "type": "number",
+                    "default": null,
+                    "minimum": 0.0,
+                    "maximum": 1.0
+                },
+                "key_length": {
+                    "type": "integer",
+                    "default": 1024,
+                    "exclusiveMinimum": 0
+                },
+                "random_bit": {
+                    "type": "integer",
+                    "default": 128,
+                    "exclusiveMinimum": 0
+                }
+            },
+            "additionalProperties": false
+        },
+        "dh_params": {
+            "type": "object",
+            "properties": {
+                "salt": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "hash_method": {
+                    "$ref": "#/$defs/available_hash_method"
+                },
+                "key_length": {
+                    "type": "integer",
+                    "default": 1024,
+                    "minimum": 768
+                }
+            },
+            "additionalProperties": false
+        },
+        "join_method": {
+            "type": "string",
+            "default": "inner_join",
+            "pattern": "(?i)^inner_join$|^left_join$"
+        },
+        "new_sample_id": {
+            "type": "boolean",
+            "default": false
+        },
+        "sample_id_generator": {
+            "$ref": "#/$defs/role_default_guest"
+        },
+        "run_cache": {
+            "type": "boolean",
+            "default": false
+        },
+        "cardinality_only": {
+            "type": "boolean",
+            "default": false
+        },
+        "sync_cardinality": {
+            "type": "boolean",
+            "default": false
+        },
+        "run_preprocess": {
+            "type": "boolean",
+            "default": false
+        },
+        "intersect_preprocess_param": {
+            "type": "object",
+            "properties": {
+                "false_positive_rate": {
+                    "type": "number",
+                    "default": null,
+                    "maximum": 0.5
+                },
+                "preprocess_method": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "preprocess_salt": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "encrypt_method": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "hash_method": {
+                    "$ref": "#/$defs/available_hash_method"
+                },
+                "random_state": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "default": null
+                },
+                "filter_owner": {
+                    "$ref": "#/$defs/role_default_guest"
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "required": [
+        "intersect_method",
+        "only_output_key",
+        "sync_intersect_ids"
+    ],
+    "$defs": {
+        "available_hash_method": {
+            "type": "string",
+            "enum": [
+                "none",
+                "md5",
+                "sha1",
+                "sha224",
+                "sha256",
+                "sha384",
+                "sha512",
+                "sm3"
+            ]
+        },
+        "strict_hash_method": {
+            "type": "string",
+            "enum": [
+                "sha256",
+                "sha384",
+                "sha512",
+                "sm3"
+            ]
+        },
+        "role_default_guest": {
+            "type": "string",
+            "enum": [
+                "guest",
+                "host"
+            ],
+            "default": "guest"
+        }
+    }
+}

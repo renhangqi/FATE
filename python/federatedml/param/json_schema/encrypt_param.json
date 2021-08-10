@@ -1,0 +1,22 @@
+{
+    "title": "EncryptParam",
+    "description": "encrypt param",
+    "type": "object",
+    "properties": {
+        "method": {
+            "type": "string",
+            "pattern": "(?i)^paillier$|^iterativeaffine$|^randomiterativeaffine$",
+            "default": "paillier"
+        },
+        "key_length": {
+            "type": "integer",
+            "default": 1024,
+            "exclusiveMinimum": 0
+        }
+    },
+    "required": [
+        "method",
+        "key_length"
+    ],
+    "additionalProperties": false
+}

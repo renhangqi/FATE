@@ -1,0 +1,67 @@
+{
+    "title": "DataSplitParam",
+    "description": "data split param",
+    "type": "object",
+    "properties": {
+        "random_state": {
+            "type": [
+                "integer",
+                "null"
+            ],
+            "default": null
+        },
+        "test_size": {
+            "type": [
+                "number",
+                "null"
+            ],
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "default": 0.0
+        },
+        "train_size": {
+            "type": [
+                "number",
+                "null"
+            ],
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "default": 0.8
+        },
+        "validate_size": {
+            "type": [
+                "number",
+                "null"
+            ],
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "default": 0.2
+        },
+        "stratified": {
+            "type": "boolean",
+            "default": false
+        },
+        "shuffle": {
+            "type": "boolean",
+            "default": true
+        },
+        "split_points": {
+            "type": [
+                "array",
+                "null"
+            ],
+            "items": {
+                "type": "number"
+            },
+            "default": null
+        },
+        "need_run": {
+            "type": "boolean",
+            "default": true
+        }
+    },
+    "required": [
+        "need_run"
+    ],
+    "additionalProperties": false
+}

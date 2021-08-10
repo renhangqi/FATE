@@ -1,0 +1,47 @@
+{
+    "title": "FeatureImputationParam",
+    "description": "feature imputation param",
+    "type": "object",
+    "properties": {
+        "default_value": {
+            "type": [
+                "string",
+                "number",
+                "array",
+                "null"
+            ],
+            "default": 0
+        },
+        "missing_fill_method": {
+            "type": [
+                "string",
+                "null"
+            ],
+            "default": null
+        },
+        "col_missing_fill_method": {
+            "type": [
+                "object",
+                "null"
+            ],
+            "additionalProperties": {
+                "type": "string"
+            }
+        },
+        "missing_impute": {
+            "type": [
+                "array",
+                "null"
+            ],
+            "default": null
+        },
+        "need_run": {
+            "type": "boolean",
+            "default": true
+        }
+    },
+    "required": [
+        "need_run"
+    ],
+    "additionalProperties": false
+}

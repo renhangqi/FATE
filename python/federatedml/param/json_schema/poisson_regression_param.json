@@ -1,0 +1,116 @@
+{
+    "title": "PoissonRegressionParam",
+    "description": "poisson regression param",
+    "type": "object",
+    "properties": {
+        "penalty": {
+            "type": "string",
+            "pattern": "(?i)^L1$|^L2$|^NONE$",
+            "default": "L2"
+        },
+        "tol": {
+            "type": "number",
+            "default": 1e-05
+        },
+        "alpha": {
+            "type": "number",
+            "default": 1.0
+        },
+        "optimizer": {
+            "type": "string",
+            "pattern": "(?i)^sgd$|^rmsprop$|^adam$|^adagrad$|^sqn$",
+            "default": "sgd"
+        },
+        "batch_size": {
+            "type": "integer",
+            "minimum": -1,
+            "default": -1
+        },
+        "learning_rate": {
+            "type": "number",
+            "default": 0.01
+        },
+        "init_param": {
+            "type": "object"
+        },
+        "max_iter": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "default": 100
+        },
+        "early_stop": {
+            "type": "string",
+            "pattern": "(?i)^diff$|^weight_diff$",
+            "default": "diff"
+        },
+        "exposure_colname": {
+            "type": [
+                "string",
+                "null"
+            ],
+            "default": null
+        },
+        "predict_param": {
+            "type": "object"
+        },
+        "encrypt_param": {
+            "type": "object"
+        },
+        "sqn_param": {
+            "type": "object"
+        },
+        "encrypted_mode_calculator_param": {
+            "type": "object"
+        },
+        "cv_param": {
+            "type": "object"
+        },
+        "decay": {
+            "type": "number",
+            "default": 1
+        },
+        "decay_sqrt": {
+            "type": "boolean",
+            "default": true
+        },
+        "validation_freqs": {
+            "type": [
+                "integer",
+                "null"
+            ],
+            "exclusiveMinimum": 0,
+            "default": null
+        },
+        "early_stopping_rounds": {
+            "type": [
+                "integer",
+                "null"
+            ],
+            "exclusiveMinimum": 0,
+            "default": null
+        },
+        "stepwise_param": {
+            "type": "object"
+        },
+        "metrics": {
+            "type": [
+                "array",
+                "null"
+            ],
+            "items": {
+                "type": "string"
+            },
+            "default": null
+        },
+        "use_first_metric_only": {
+            "type": "boolean",
+            "default": false
+        },
+        "floating_point_precision": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 23
+        }
+    },
+    "additionalProperties": false
+}

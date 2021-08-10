@@ -1,0 +1,38 @@
+{
+    "title": "ColumnExpandParam",
+    "description": "column expand param",
+    "type": "object",
+    "properties": {
+        "append_header": {
+            "type": [
+                "string",
+                "array",
+                "null"
+            ],
+            "items": {
+                "type": "string"
+            },
+            "default": null
+        },
+        "method": {
+            "type": "string",
+            "pattern": "(?i)^manual$"
+        },
+        "fill_value": {
+            "type": [
+                "number",
+                "string",
+                "array"
+            ],
+            "default": 1e-08
+        },
+        "need_run": {
+            "type": "boolean",
+            "default": true
+        }
+    },
+    "required": [
+        "need_run"
+    ],
+    "additionalProperties": false
+}

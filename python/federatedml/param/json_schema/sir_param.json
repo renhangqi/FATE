@@ -1,0 +1,52 @@
+{
+    "title": "SecureInformationRetrievalParam",
+    "description": "secure information retrieval param",
+    "type": "object",
+    "properties": {
+        "security_level": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.5
+        },
+        "oblivious_transfer_protocol": {
+            "type": "string",
+            "pattern": "(?i)^OT_Hauck$",
+            "default": "OT_Hauck"
+        },
+        "commutative_encryption": {
+            "type": "string",
+            "pattern": "(?i)^ce_ph$",
+            "default": "ce_ph"
+        },
+        "non_committing_encryption": {
+            "type": "string",
+            "pattern": "(?i)^aes$",
+            "default": "aes"
+        },
+        "key_size": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "default": 1024
+        },
+        "dh_params": {
+            "type": "object"
+        },
+        "raw_retrieval": {
+            "type": "boolean",
+            "default": false
+        },
+        "target_cols": {
+            "type": [
+                "string",
+                "array",
+                "null"
+            ],
+            "items": {
+                "type": "string"
+            },
+            "default": null
+        }
+    },
+    "additionalProperties": false
+}

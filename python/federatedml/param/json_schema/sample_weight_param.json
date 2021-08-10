@@ -1,0 +1,36 @@
+{
+    "title": "SampleWeightParam",
+    "description": "sample weight param",
+    "type": "object",
+    "properties": {
+        "class_weight": {
+            "type": [
+                "string",
+                "object",
+                "null"
+            ],
+            "additionalProperties": {
+                "type": "number"
+            }
+        },
+        "sample_weight_name": {
+            "type": [
+                "string",
+                "null"
+            ],
+            "default": null
+        },
+        "normalize": {
+            "type": "boolean",
+            "default": false
+        },
+        "need_run": {
+            "type": "boolean",
+            "default": true
+        }
+    },
+    "required": [
+        "need_run"
+    ],
+    "additionalProperties": false
+}

@@ -1,0 +1,23 @@
+{
+    "title": "UnionParam",
+    "description": "union param",
+    "type": "object",
+    "properties": {
+        "need_run": {
+            "type": "boolean",
+            "default": true
+        },
+        "allow_missing": {
+            "type": "boolean",
+            "default": false
+        },
+        "keep_duplicate": {
+            "type": "boolean",
+            "default": false
+        }
+    },
+    "required": [
+        "need_run"
+    ],
+    "additionalProperties": false
+}

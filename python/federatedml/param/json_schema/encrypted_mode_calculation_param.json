@@ -1,0 +1,22 @@
+{
+    "title": "EncryptedModeCalculatorParam",
+    "description": "encrypted mode calculator param",
+    "type": "object",
+    "properties": {
+        "mode": {
+            "type": "string",
+            "pattern": "(?i)^strict$|^fast$|^balance$|^confusion_opt$|^confusion_opt_balance$",
+            "default": "strict"
+        },
+        "re_encrypted_rate": {
+            "type": "number",
+            "default": 1,
+            "minimum": 0,
+            "maximum": 1
+        }
+    },
+    "required": [
+        "mode"
+    ],
+    "additionalProperties": false
+}

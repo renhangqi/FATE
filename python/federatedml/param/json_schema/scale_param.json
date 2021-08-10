@@ -1,0 +1,76 @@
+{
+    "title": "ScaleParam",
+    "description": "scale param",
+    "type": "object",
+    "properties": {
+        "method": {
+            "type": "string",
+            "pattern": "(?i)^min_max_scale$|^standard_scale$",
+            "default": "standard_scale"
+        },
+        "mode": {
+            "type": "string",
+            "pattern": "(?i)^normal$|^cap$",
+            "default": "normal"
+        },
+        "scale_col_indexes": {
+            "type": [
+                "array",
+                "integer",
+                "null"
+            ],
+            "items": {
+                "type": "integer"
+            },
+            "default": -1
+        },
+        "scale_names": {
+            "type": [
+                "array",
+                "null"
+            ],
+            "items": {
+                "type": "string"
+            },
+            "default": null
+        },
+        "feat_upper": {
+            "type": [
+                "number",
+                "array",
+                "null"
+            ],
+            "items": {
+                "type": "number"
+            },
+            "default": null
+        },
+        "feat_lower": {
+            "type": [
+                "number",
+                "array",
+                "null"
+            ],
+            "items": {
+                "type": "number"
+            },
+            "default": null
+        },
+        "with_std": {
+            "type": "boolean",
+            "default": true
+        },
+        "with_mean": {
+            "type": "boolean",
+            "default": true
+        },
+        "need_run": {
+            "type": "boolean",
+            "default": true
+        }
+    },
+    "required": [
+        "need_run"
+    ],
+    "additionalProperties": false
+}

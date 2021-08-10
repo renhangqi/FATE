@@ -1,0 +1,40 @@
+{
+    "title": "ScorecardParam",
+    "description": "scorecard param",
+    "type": "object",
+    "properties": {
+        "method": {
+            "type": "string",
+            "pattern": "(?i)^credit$",
+            "default": "credit"
+        },
+        "offset": {
+            "type": "number",
+            "default": 500
+        },
+        "factor": {
+            "type": "number",
+            "default": 20
+        },
+        "factor_base": {
+            "type": "number",
+            "default": 2
+        },
+        "upper_limit_ratio": {
+            "type": "number",
+            "default": 3
+        },
+        "lower_limit_ratio": {
+            "type": "number",
+            "default": 0
+        },
+        "need_run": {
+            "type": "boolean",
+            "default": true
+        }
+    },
+    "required": [
+        "need_run"
+    ],
+    "additionalProperties": false
+}

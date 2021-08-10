@@ -1,0 +1,25 @@
+{
+    "title": "LocalBaselineParam",
+    "description": "local baseline param",
+    "type": "object",
+    "properties": {
+        "model_name": {
+            "pattern": "(?i)LogisticRegression",
+            "default": "LogisticRegression"
+        },
+        "model_opts": {
+            "type": "object"
+        },
+        "predict_param": {
+            "type": "object"
+        },
+        "need_run": {
+            "type": "boolean",
+            "default": true
+        }
+    },
+    "required": [
+        "need_run"
+    ],
+    "additionalProperties": false
+}
