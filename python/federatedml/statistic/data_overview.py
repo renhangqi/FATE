@@ -206,8 +206,10 @@ def get_predict_result_labels(data):
     def _get_labels(score_inst):
         labels = set()
         for idx, result in score_inst:
-            label = result.features[0]
-            labels.add(label)
+            true_label = result.features[0]
+            predict_label = result.features[1]
+            labels.add(true_label)
+            labels.add(predict_label)
         return labels
 
     label_set = data.applyPartitions(_get_labels)
