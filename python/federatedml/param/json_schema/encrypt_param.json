@@ -14,9 +14,5 @@
             "exclusiveMinimum": 0
         }
     },
-    "required": [
-        "method",
-        "key_length"
-    ],
     "additionalProperties": false
 }

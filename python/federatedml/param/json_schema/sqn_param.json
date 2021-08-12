@@ -1,0 +1,30 @@
+{
+    "title": "StochasticQuasiNewtonParam",
+    "description": "stochastic quasi newton param",
+    "type": "object",
+    "properties": {
+        "update_interval_L": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "default": 3
+        },
+        "memory_M": {
+            "type": "integer",
+            "default": 5,
+            "exclusiveMinimum": 0
+        },
+        "sample_size": {
+            "type": "integer",
+            "default": 5000,
+            "exclusiveMinimum": 0
+        },
+        "random_seed": {
+            "type": [
+                "integer",
+                "null"
+            ],
+            "default": null
+        }
+    },
+    "additionalProperties": false
+}

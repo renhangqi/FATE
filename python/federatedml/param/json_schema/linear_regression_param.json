@@ -44,7 +44,10 @@
             "default": "diff"
         },
         "predict_param": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+                "threshold": "number"
+            }
         },
         "encrypt_param": {
             "type": "object"
