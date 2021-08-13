@@ -1,0 +1,40 @@
+{
+    "title": "LabelTransformParam",
+    "description": "label transform param",
+    "type": "object",
+    "properties": {
+        "label_list": {
+            "type": [
+                "array",
+                "null"
+            ],
+            "items": {
+                "type": [
+                    "string",
+                    "number"
+                ]
+            },
+            "default": null
+        },
+        "label_encoder": {
+            "type": [
+                "object",
+                "null"
+            ],
+            "additionalProperties": {
+                "type": [
+                    "string",
+                    "number"
+                ]
+            }
+        },
+        "need_run": {
+            "type": "boolean",
+            "default": true
+        }
+    },
+    "required": [
+        "need_run"
+    ],
+    "additionalProperties": false
+}
