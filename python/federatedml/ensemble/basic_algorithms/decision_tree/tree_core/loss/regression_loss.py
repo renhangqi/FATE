@@ -21,6 +21,7 @@ from federatedml.statistic.statics import MultivariateStatisticalSummary
 
 
 class LeastSquaredErrorLoss(object):
+
     @staticmethod
     def initialize(y):
         y_inst = y.mapValues(lambda label: Instance(features=np.asarray([label])))
