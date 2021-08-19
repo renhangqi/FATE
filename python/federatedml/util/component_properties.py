@@ -35,12 +35,8 @@ class RunningFuncs(object):
         self.use_previews_result.append(use_previews)
 
     def __iter__(self):
-        for func, params, save_result, use_previews in zip(
-            self.todo_func_list,
-            self.todo_func_params,
-            self.save_result,
-            self.use_previews_result,
-        ):
+        for func, params, save_result, use_previews in zip(self.todo_func_list, self.todo_func_params,
+                                                           self.save_result, self.use_previews_result):
             yield func, params, save_result, use_previews
 
 
@@ -67,20 +63,22 @@ class ComponentProperties(object):
         self.input_data_count = 0
         self.input_eval_data_count = 0
 
-    def parse_component_param(self, roles, param):
+    def parse_component_param(self, component_parameters, param):
 
         try:
             need_cv = param.cv_param.need_cv
         except AttributeError:
             need_cv = False
         self.need_cv = need_cv
+        LOGGER.debug(component_parameters)
 
         try:
             need_run = param.need_run
         except AttributeError:
             need_run = True
         self.need_run = need_run
-        LOGGER.debug("need_run: {}, need_cv: {}".format(self.need_run, self.need_cv))
+
+        LOGGER.debug(f"need_run: {self.need_run}, need_cv: {self.need_cv}")
 
         try:
             need_stepwise = param.stepwise_param.need_stepwise
@@ -88,126 +86,100 @@ class ComponentProperties(object):
             need_stepwise = False
         self.need_stepwise = need_stepwise
 
-        self.role = roles["local"]["role"]
-        self.host_party_idlist = roles["role"].get("host")
-        self.local_partyid = roles["local"].get("party_id")
-        self.guest_partyid = roles["role"].get("guest")
+        self.role = component_parameters["local"]["role"]
+        self.host_party_idlist = component_parameters["role"].get("host")
+        self.local_partyid = component_parameters["local"].get("party_id")
+        self.guest_partyid = component_parameters["role"].get("guest")
         if self.guest_partyid is not None:
             self.guest_partyid = self.guest_partyid[0]
         return self
 
-    def parse_dsl_args(self, datasets, model):
-        if "model" in model and model["model"] is not None:
+    def parse_dsl_args(self, args):
+        if "model" in args:
             self.has_model = True
-        if "isometric_model" in model and model["isometric_model"] is not None:
+        if "isometric_model" in args:
             self.has_isometric_model = True
-        LOGGER.debug(f"parse_dsl_args data_sets: {datasets}")
-        if datasets is None:
+        data_sets = args.get("data")
+        LOGGER.debug(f"parse_dsl_args data_sets: {data_sets}")
+        if data_sets is None:
             return self
-        for data_key, data_dicts in datasets.items():
+        for data_key, data_dicts in data_sets.items():
             data_keys = list(data_dicts.keys())
 
             for data_type in ["train_data", "eval_data", "validate_data", "test_data"]:
                 if data_type in data_keys:
                     setattr(self, f"has_{data_type}", True)
                     data_keys.remove(data_type)
-                LOGGER.debug(
-                    f"[Data Parser], has_{data_type}:"
-                    f" {getattr(self, f'has_{data_type}')}"
-                )
+                LOGGER.debug(f"[Data Parser], has_{data_type}:"
+                             f" {getattr(self, f'has_{data_type}')}")
 
             if len(data_keys) > 0:
                 self.has_normal_input_data = True
 
-        LOGGER.debug(
-            "[Data Parser], has_normal_data: {}".format(self.has_normal_input_data)
-        )
+        LOGGER.debug("[Data Parser], has_normal_data: {}".format(self.has_normal_input_data))
         if self.has_eval_data:
             if self.has_validate_data or self.has_test_data:
-                raise DSLConfigError(
-                    "eval_data input should not be configured simultaneously"
-                    " with validate_data or test_data"
-                )
+                raise DSLConfigError("eval_data input should not be configured simultaneously"
+                                     " with validate_data or test_data")
         # self._abnormal_dsl_config_detect()
         return self
 
     def _abnormal_dsl_config_detect(self):
         if self.has_validate_data:
             if not self.has_train_data:
-                raise DSLConfigError(
-                    "validate_data should be configured simultaneously"
-                    " with train_data"
-                )
+                raise DSLConfigError("validate_data should be configured simultaneously"
+                                     " with train_data")
 
         if self.has_train_data:
             if self.has_normal_input_data or self.has_test_data:
-                raise DSLConfigError(
-                    "train_data input should not be configured simultaneously"
-                    " with data or test_data"
-                )
+                raise DSLConfigError("train_data input should not be configured simultaneously"
+                                     " with data or test_data")
 
         if self.has_normal_input_data:
             if self.has_train_data or self.has_validate_data or self.has_test_data:
-                raise DSLConfigError(
-                    "When data input has been configured, train_data, "
-                    "validate_data or test_data should not be configured."
-                )
+                raise DSLConfigError("When data input has been configured, train_data, "
+                                     "validate_data or test_data should not be configured.")
 
         if self.has_test_data:
             if not self.has_model:
-                raise DSLConfigError(
-                    "When test_data input has been configured, model "
-                    "input should be configured too."
-                )
+                raise DSLConfigError("When test_data input has been configured, model "
+                                     "input should be configured too.")
 
         if self.has_model:
             if self.has_train_data:
-                raise DSLConfigError(
-                    "train_data input and model input should not be "
-                    "configured simultaneously"
-                )
+                raise DSLConfigError("train_data input and model input should not be "
+                                     "configured simultaneously")
             if self.has_isometric_model:
-                raise DSLConfigError(
-                    "model and isometric_model should not be "
-                    "configured simultaneously"
-                )
+                raise DSLConfigError("model and isometric_model should not be "
+                                     "configured simultaneously")
             if not self.has_test_data and not self.has_normal_input_data:
-                raise DSLConfigError(
-                    "When model has been set, either test_data or "
-                    "data should be provided"
-                )
+                raise DSLConfigError("When model has been set, either test_data or "
+                                     "data should be provided")
 
         if self.need_cv or self.need_stepwise:
             if not self.has_train_data:
-                raise DSLConfigError(
-                    "Train_data should be configured in cross-validate "
-                    "task or stepwise task"
-                )
-            if (
-                self.has_validate_data
-                or self.has_normal_input_data
-                or self.has_test_data
-            ):
-                raise DSLConfigError(
-                    "Train_data should be set only if it is a cross-validate "
-                    "task or a stepwise task"
-                )
-            if self.has_model or self.has_isometric_model:
-                raise DSLConfigError(
-                    "In cross-validate task or stepwise task, model "
-                    "or isometric_model should not be configured"
-                )
+                raise DSLConfigError("Train_data should be configured in cross-validate "
+                                     "task or stepwise task")
+            if self.has_validate_data or self.has_normal_input_data or \
+                    self.has_test_data:
+                raise DSLConfigError("Train_data should be set only in cross-validate "
+                                     "task or stepwise task")
 
-    def extract_input_data(self, datasets, model):
+            if self.has_model or self.has_isometric_model:
+                raise DSLConfigError("In cross-validate task or stepwise task, model "
+                                     "or isometric_model should not be configured")
+
+    def extract_input_data(self, args, model):
+        data_sets = args.get("data")
         model_data = {}
         data = {}
 
-        if datasets is None:
+        if data_sets is None:
             return model_data, data
 
-        LOGGER.debug(f"Input data_sets: {datasets}")
+        LOGGER.debug(f"Input data_sets: {data_sets}")
 
-        for cpn_name, data_dict in datasets.items():
+        for cpn_name, data_dict in data_sets.items():
             for data_type in ["train_data", "eval_data", "validate_data", "test_data"]:
                 if data_type in data_dict:
                     d_table = data_dict.get(data_type)
@@ -215,7 +187,7 @@ class ComponentProperties(object):
                     del data_dict[data_type]
 
             if len(data_dict) > 0:
-                LOGGER.debug(f"data_dict: {data_dict}")
+                LOGGER.debug(f'data_dict: {data_dict}')
                 for k, v in data_dict.items():
                     data_list = model.obtain_data(v)
                     LOGGER.debug(f"data_list: {data_list}")
@@ -225,19 +197,19 @@ class ComponentProperties(object):
                     else:
                         data[".".join([cpn_name, k])] = data_list
 
-        train_data = model_data.get("train_data")
+        train_data = model_data.get('train_data')
         validate_data = None
         if self.has_train_data:
             if self.has_eval_data:
-                validate_data = model_data.get("eval_data")
+                validate_data = model_data.get('eval_data')
             elif self.has_validate_data:
-                validate_data = model_data.get("validate_data")
+                validate_data = model_data.get('validate_data')
         test_data = None
         if self.has_test_data:
-            test_data = model_data.get("test_data")
+            test_data = model_data.get('test_data')
             self.has_test_data = True
         elif self.has_eval_data and not self.has_train_data:
-            test_data = model_data.get("eval_data")
+            test_data = model_data.get('eval_data')
             self.has_test_data = True
 
         # self.has_train_data = True if train_data else False
@@ -257,18 +229,14 @@ class ComponentProperties(object):
             self.input_eval_data_count = validate_data.count()
 
         self._abnormal_dsl_config_detect()
-        LOGGER.debug(
-            f"train_data: {train_data}, validate_data: {validate_data}, "
-            f"test_data: {test_data}, data: {data}"
-        )
+        LOGGER.debug(f"train_data: {train_data}, validate_data: {validate_data}, "
+                     f"test_data: {test_data}, data: {data}")
         return train_data, validate_data, test_data, data
 
-    def extract_running_rules(self, datasets, models, cpn):
+    def extract_running_rules(self, args, model):
 
         # train_data, eval_data, data = self.extract_input_data(args)
-        train_data, validate_data, test_data, data = self.extract_input_data(
-            datasets, cpn
-        )
+        train_data, validate_data, test_data, data = self.extract_input_data(args, model)
 
         running_funcs = RunningFuncs()
         schema = None
@@ -278,90 +246,61 @@ class ComponentProperties(object):
                 break
 
         if not self.need_run:
-            running_funcs.add_func(cpn.pass_data, [data], save_result=True)
+            running_funcs.add_func(model.pass_data, [data], save_result=True)
             return running_funcs
 
         if self.need_cv:
-            running_funcs.add_func(cpn.cross_validation, [train_data], save_result=True)
+            running_funcs.add_func(model.cross_validation, [train_data], save_result=True)
             return running_funcs
 
         if self.need_stepwise:
-            running_funcs.add_func(cpn.stepwise, [train_data], save_result=True)
-            running_funcs.add_func(
-                self.union_data, ["train"], use_previews=True, save_result=True
-            )
-            running_funcs.add_func(
-                cpn.set_predict_data_schema,
-                [schema],
-                use_previews=True,
-                save_result=True,
-            )
+            running_funcs.add_func(model.stepwise, [train_data], save_result=True)
+            running_funcs.add_func(self.union_data, ["train"], use_previews=True, save_result=True)
+            running_funcs.add_func(model.set_predict_data_schema, [schema],
+                                   use_previews=True, save_result=True)
             return running_funcs
 
         if self.has_model or self.has_isometric_model:
-            running_funcs.add_func(cpn.load_model, [models])
+            running_funcs.add_func(model.load_model, [args])
 
         if self.has_train_data and self.has_validate_data:
             # todo_func_list.extend([model.set_flowid, model.fit, model.set_flowid, model.predict])
             # todo_func_params.extend([['fit'], [train_data], ['validate'], [train_data, 'validate']])
-            running_funcs.add_func(cpn.set_flowid, ["fit"])
-            running_funcs.add_func(cpn.fit, [train_data, validate_data])
-            running_funcs.add_func(cpn.set_flowid, ["validate"])
-            running_funcs.add_func(cpn.predict, [train_data], save_result=True)
-            running_funcs.add_func(cpn.set_flowid, ["predict"])
-            running_funcs.add_func(cpn.predict, [validate_data], save_result=True)
-            running_funcs.add_func(
-                self.union_data,
-                ["train", "validate"],
-                use_previews=True,
-                save_result=True,
-            )
-            running_funcs.add_func(
-                cpn.set_predict_data_schema,
-                [schema],
-                use_previews=True,
-                save_result=True,
-            )
+            running_funcs.add_func(model.set_flowid, ['fit'])
+            running_funcs.add_func(model.fit, [train_data, validate_data])
+            running_funcs.add_func(model.set_flowid, ['validate'])
+            running_funcs.add_func(model.predict, [train_data], save_result=True)
+            running_funcs.add_func(model.set_flowid, ['predict'])
+            running_funcs.add_func(model.predict, [validate_data], save_result=True)
+            running_funcs.add_func(self.union_data, ["train", "validate"], use_previews=True, save_result=True)
+            running_funcs.add_func(model.set_predict_data_schema, [schema],
+                                   use_previews=True, save_result=True)
 
         elif self.has_train_data:
-            running_funcs.add_func(cpn.set_flowid, ["fit"])
-            running_funcs.add_func(cpn.fit, [train_data])
-            running_funcs.add_func(cpn.set_flowid, ["validate"])
-            running_funcs.add_func(cpn.predict, [train_data], save_result=True)
-            running_funcs.add_func(
-                self.union_data, ["train"], use_previews=True, save_result=True
-            )
-            running_funcs.add_func(
-                cpn.set_predict_data_schema,
-                [schema],
-                use_previews=True,
-                save_result=True,
-            )
+            running_funcs.add_func(model.set_flowid, ['fit'])
+            running_funcs.add_func(model.fit, [train_data])
+            running_funcs.add_func(model.set_flowid, ['validate'])
+            running_funcs.add_func(model.predict, [train_data], save_result=True)
+            running_funcs.add_func(self.union_data, ["train"], use_previews=True, save_result=True)
+            running_funcs.add_func(model.set_predict_data_schema, [schema],
+                                   use_previews=True, save_result=True)
 
         elif self.has_test_data:
-            running_funcs.add_func(cpn.set_flowid, ["predict"])
-            running_funcs.add_func(cpn.predict, [test_data], save_result=True)
-            running_funcs.add_func(
-                self.union_data, ["predict"], use_previews=True, save_result=True
-            )
-            running_funcs.add_func(
-                cpn.set_predict_data_schema,
-                [schema],
-                use_previews=True,
-                save_result=True,
-            )
+            running_funcs.add_func(model.set_flowid, ['predict'])
+            running_funcs.add_func(model.predict, [test_data], save_result=True)
+            running_funcs.add_func(self.union_data, ["predict"], use_previews=True, save_result=True)
+            running_funcs.add_func(model.set_predict_data_schema, [schema],
+                                   use_previews=True, save_result=True)
 
         if self.has_normal_input_data and not self.has_model:
-            running_funcs.add_func(cpn.extract_data, [data], save_result=True)
-            running_funcs.add_func(cpn.set_flowid, ["fit"])
-            running_funcs.add_func(cpn.fit, [], use_previews=True, save_result=True)
+            running_funcs.add_func(model.extract_data, [data], save_result=True)
+            running_funcs.add_func(model.set_flowid, ['fit'])
+            running_funcs.add_func(model.fit, [], use_previews=True, save_result=True)
 
         if self.has_normal_input_data and self.has_model:
-            running_funcs.add_func(cpn.extract_data, [data], save_result=True)
-            running_funcs.add_func(cpn.set_flowid, ["transform"])
-            running_funcs.add_func(
-                cpn.transform, [], use_previews=True, save_result=True
-            )
+            running_funcs.add_func(model.extract_data, [data], save_result=True)
+            running_funcs.add_func(model.set_flowid, ['transform'])
+            running_funcs.add_func(model.transform, [], use_previews=True, save_result=True)
 
         return running_funcs
 
@@ -384,9 +323,7 @@ class ComponentProperties(object):
             if result_data is None:
                 result_data = data
             else:
-                LOGGER.debug(
-                    f"Before union, t1 count: {result_data.count()}, t2 count: {data.count()}"
-                )
+                LOGGER.debug(f"Before union, t1 count: {result_data.count()}, t2 count: {data.count()}")
                 result_data = result_data.union(data)
                 LOGGER.debug(f"After union, result count: {result_data.count()}")
             # LOGGER.debug("before out loop, one data: {}".format(result_data.first()))
@@ -395,3 +332,5 @@ class ComponentProperties(object):
 
     def set_union_func(self, func):
         self.union_data = func
+
+
