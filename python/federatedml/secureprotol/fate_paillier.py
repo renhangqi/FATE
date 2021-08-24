@@ -334,4 +334,3 @@ class PaillierEncryptedNumber(object):
         ciphertext = gmpy_math.mpz(e_x) * gmpy_math.mpz(e_y) % self.public_key.nsquare
 
         return PaillierEncryptedNumber(self.public_key, int(ciphertext), exponent)
-
