@@ -80,8 +80,6 @@ class HomoLRHost(HomoLRBase):
 
         if self.use_encrypt:
             re_encrypt_times = (total_batch_num - 1) // self.re_encrypt_batches + 1
-            # LOGGER.debug("re_encrypt_times is :{}, batch_size: {}, total_batch_num: {}, re_encrypt_batches: {}".format(
-            #     re_encrypt_times, self.batch_size, total_batch_num, self.re_encrypt_batches))
             self.cipher.set_re_cipher_time(re_encrypt_times)
 
         # total_data_num = data_instances.count()
@@ -96,10 +94,7 @@ class HomoLRHost(HomoLRBase):
             if ((self.n_iter_ + 1) % self.aggregate_iters == 0) or self.n_iter_ == self.max_iter:
                 weight = self.aggregator.aggregate_then_get(model_weights, degree=degree,
                                                             suffix=self.n_iter_)
-                # LOGGER.debug("Before aggregate: {}, degree: {} after aggregated: {}".format(
-                #     model_weights.unboxed / degree,
-                #     degree,
-                #     weight.unboxed))
+
                 self.model_weights = LogisticRegressionWeights(weight.unboxed, self.fit_intercept)
                 if not self.use_encrypt:
                     loss = self._compute_loss(data_instances, self.prev_round_weights)
