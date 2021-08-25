@@ -13,7 +13,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
-# from federatedml.logistic_regression import homo_logsitic_regression, hetero_logistic_regression
-# from federatedml.logistic_regression.logistic_regression import LogisticRegression
-#
-# __all__ = ['homo_logsitic_regression', 'hetero_logistic_regression', 'LogisticRegression']
+
+
+class Cache(object):
+    def __init__(self, cache=None):
+        self._cache = cache
+
+    def __getattr__(self, cache_key):
+        if cache_key == "cache":
+            return self._cache
+        else:
+            raise ValueError("cache key {} not support".format(cache_key))
+
